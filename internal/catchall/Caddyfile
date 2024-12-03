@@ -1,0 +1,14 @@
+{
+	auto_https off
+}
+
+:80 {
+	root * /var/www
+	file_server
+
+	handle_path /404/*.html {
+		header {
+			Status 404
+		}
+	}
+}

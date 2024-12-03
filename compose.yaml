@@ -1,0 +1,144 @@
+name: proxy
+
+networks:
+  proxy:
+    name: proxy  # globally unique for import
+
+volumes:
+  proxy_certs:
+    name: proxy_certs  # globally unique for import
+
+services:
+
+  dnsmasq:
+    image: dockurr/dnsmasq:2.90
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges=true
+    networks:
+      proxy:
+    ports:
+      - ${DOCKER_DEFAULT_IP:-172.17.0.1}:53:53/udp
+      - ${DOCKER_DEFAULT_IP:-172.17.0.1}:53:53/tcp
+    volumes:
+      - ./internal/dns/dnsmasq.conf:/etc/dnsmasq.conf:ro
+    entrypoint: /sbin/tini -- dnsmasq
+    command:
+      - '--address=/.test/${DOCKER_DEFAULT_IP:-172.17.0.1}'
+      - '--address=/.test/::'  # silence IPv6 with loopback
+    healthcheck:
+      test: 'test -n "$(netstat -nltu | grep -F :53)"'
+      interval: 5s
+      timeout: 1s
+      retries: 3
+
+  traefik:
+    depends_on:
+      dnsmasq:
+        condition: service_healthy
+    image: traefik:v3.2.2
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges=true
+    networks:
+      proxy:
+    ports:
+      - ${DOCKER_DEFAULT_IP:-172.17.0.1}:80:80/tcp
+      - ${DOCKER_DEFAULT_IP:-172.17.0.1}:443:443/tcp
+    volumes:
+      - proxy_certs:/certs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./internal/router:/etc/traefik:ro
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        # update system certificate bundle
+        cp /etc/traefik/certs/proxy-ca.crt /usr/local/share/ca-certificates
+        update-ca-certificates
+        # export ca and bundle for reuse
+        cp /etc/traefik/certs/proxy-ca.crt /certs/proxy-ca.crt
+        cp /etc/ssl/certs/ca-certificates.crt /certs/ca-bundle.crt
+        # start server
+        exec traefik
+    healthcheck:
+      test: traefik healthcheck
+      interval: 5s
+      timeout: 1s
+      retries: 3
+    labels:
+      traefik.enable: true
+      # local_router
+      traefik.http.routers.local_router.service: api@internal  # bind to traefik API
+      traefik.http.routers.local_router.rule: Host(`router.local.test`)
+      traefik.http.services.local_router.loadbalancer.server.port: 80
+
+  catchall:
+    depends_on:
+      traefik:
+        condition: service_healthy
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    networks:
+      proxy:
+    volumes:
+      - ./internal/catchall/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./internal/catchall/public:/var/www:ro
+    deploy:
+      mode: global
+    labels:
+      traefik.enable: true
+      # local_homepage
+      traefik.http.routers.local_homepage.service: local_homepage
+      traefik.http.routers.local_homepage.rule: Host(`local.test`) || Path(`/favicon.ico`)
+      traefik.http.routers.local_homepage.middlewares: local_homepage
+      traefik.http.services.local_homepage.loadbalancer.server.port: 80
+      traefik.http.middlewares.local_homepage.addprefix.prefix: /start
+      # local_catch_undefined
+      traefik.http.routers.local_catch_undefined.service: local_catch_undefined
+      traefik.http.routers.local_catch_undefined.rule: Host(`local.test`) || Path(`/`)
+      traefik.http.routers.local_catch_undefined.priority: 1  # execute last
+      traefik.http.routers.local_catch_undefined.middlewares: local_catch_undefined
+      traefik.http.services.local_catch_undefined.loadbalancer.server.port: 80
+      traefik.http.middlewares.local_catch_undefined.errors.status: 404
+      traefik.http.middlewares.local_catch_undefined.errors.service: local_catch_undefined
+      traefik.http.middlewares.local_catch_undefined.errors.query: /404/undefined.html
+
+  portainer:
+    depends_on:
+      traefik:
+        condition: service_healthy
+    image: portainer/portainer:1.25.0-alpine  # NOTE: v2 does not allow [no-auth]
+    restart: unless-stopped
+    networks:
+      proxy:
+    command:
+      - --no-auth
+      - --no-analytics
+      - --host=unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      traefik.enable: true
+      # local_docker
+      traefik.http.routers.local_docker.service: local_docker
+      traefik.http.routers.local_docker.rule: Host(`docker.local.test`)
+      traefik.http.services.local_docker.loadbalancer.server.port: 9000
+
+  whoami:
+    depends_on:
+      traefik:
+        condition: service_healthy
+    image: traefik/whoami:v1.10.3
+    restart: unless-stopped
+    networks:
+      proxy:
+    scale: 2
+    command:
+      - --verbose
+    labels:
+      traefik.enable: true
+      # local_whoami
+      traefik.http.routers.local_whoami.service: local_whoami
+      traefik.http.routers.local_whoami.rule: Host(`whoami.local.test`) && !Path(`/favicon.ico`)
+      traefik.http.services.local_whoami.loadbalancer.server.port: 80

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>404 - Route not found</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/stackoverflow-light.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/languages/yaml.min.js"></script>
+  <style>
+    * {
+      font-family: monospace;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: monospace;
+      font-size: 14px;
+      background: #f1f4f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1 {
+      margin-left: -50px;
+    }
+
+    main {
+      margin: 20px 100px;
+    }
+
+    li {
+      margin-bottom: 25px;
+    }
+
+    .highlight {
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-position: under;
+    }
+
+    code {
+      font-size: 12px;
+      max-width: 800px;
+      border: 1px solid #e6e6e6;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>404 - Route <span class="highlight replace">[HOSTNAME]</span> not found</h1>
+
+    <p>Few steps to fix the problem:</p>
+
+    <ol>
+      <li>verify <span class="highlight">docker compose</span> stack is running,
+        <br />if not - start stack
+      </li>
+      <li>verify that stack services have <span class="highlight">traefik</span> labels and <span
+          class="highlight">proxy</span> network attached,
+        <br />if not - adjust config and restart stack
+        <pre><code class="replace language-yaml"># file: compose.yaml or docker-compose.yaml
+networks:
+  proxy:
+    external: true
+  my_stack:
+
+services:
+  app1:
+    image: my_image:version
+    labels:
+      traefik.enable: true
+      traefik.http.routers.my_app1.rule: Host(`[HOSTNAME]`)
+      traefik.http.services.my_app1.loadbalancer.server.port: 8080  # container port
+    networks:
+      proxy:
+      my_stack:
+  ...
+</code></pre>
+      </li>
+      <li>didn't help? - recreate <span class="highlight">docker compose</span> stack - down & up</li>
+      <li>didn't help? - ask <span class="highlight">#experts</span></li>
+    </ol>
+
+    <p>Good luck!</p>
+  </main>
+  <script>
+    document.querySelectorAll('.replace').forEach(item => {
+      item.innerHTML = item.innerHTML.replace('[HOSTNAME]', window.location.host)
+    });
+
+    hljs.highlightAll();
+  </script>
+</body>
+
+</html>
