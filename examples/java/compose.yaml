@@ -1,0 +1,52 @@
+networks:
+  proxy:
+    external: true
+
+volumes:
+  proxy_certs:
+    external: true
+
+services:
+  java:
+    image: openjdk:21-jdk-slim
+    networks:
+      proxy:
+    working_dir: /app
+    volumes:
+      - ./src:/app:ro
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        # compile
+        javac SampleApp.java -d /tmp
+        # run
+        java -cp /tmp SampleApp
+    labels:
+      traefik.enable: true
+      traefik.http.routers.examples_java.rule: Host(`java.examples.test`)
+      traefik.http.services.examples_java.loadbalancer.server.port: 8080
+
+  java_ca:
+    image: openjdk:21-jdk-slim
+    networks:
+      proxy:
+    working_dir: /app
+    volumes:
+      - proxy_certs:/certs:ro
+      - ./src:/app:ro
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        # import custom CA root
+        keytool -cacerts -storepass changeit -list -alias proxy_root_ca >/dev/null 2>&1 \
+          || keytool -cacerts -storepass changeit -importcert -noprompt -file /certs/proxy-ca.crt -alias proxy_root_ca
+        # compile
+        javac SampleApp.java -d /tmp
+        # run
+        java -cp /tmp SampleApp
+    labels:
+      traefik.enable: true
+      traefik.http.routers.examples_java_ca.rule: Host(`java-ca.examples.test`)
+      traefik.http.services.examples_java_ca.loadbalancer.server.port: 8080

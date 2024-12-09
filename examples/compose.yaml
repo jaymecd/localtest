@@ -1,0 +1,22 @@
+include:
+  - ./python/compose.yaml
+  - ./golang/compose.yaml
+  - ./nodejs/compose.yaml
+  - ./java/compose.yaml
+
+networks:
+  proxy:
+    external: true
+
+services:
+  homepage:
+    image: caddy:2.8.4-alpine
+    networks:
+      proxy:
+    volumes:
+      - ./index.html:/usr/share/caddy/index.html:ro
+    labels:
+      traefik.enable: true
+      traefik.http.routers.examples_homepage.rule: Host(`examples.test`)
+      traefik.http.routers.examples_homepage.tls: true
+      traefik.http.services.examples_homepage.loadbalancer.server.port: 80

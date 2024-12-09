@@ -26,6 +26,11 @@ $ keytool -cacerts -storepass changeit -list -alias proxy_root_ca >/dev/null 2>&
     || keytool -cacerts -storepass changeit -importcert -noprompt -file /certs/proxy-ca.crt -alias proxy_root_ca
 ```
 
+### NodeJS
+
+`node` relies on standard CA certificated bundling, so it's enough to specify these envvars:
+    - `NODE_EXTRA_CA_CERTS=/certs/ca-bundle.pem`
+
 ### GoLang
 
 `go` relies on standard CA certificated bundling, so it's enough to specify these envvars:

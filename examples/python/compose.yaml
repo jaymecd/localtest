@@ -1,0 +1,52 @@
+networks:
+  proxy:
+    external: true
+
+volumes:
+  proxy_certs:
+    external: true
+
+services:
+  python:
+    image: python:3.12-alpine
+    networks:
+      proxy:
+    working_dir: /app
+    volumes:
+      - ./src:/app:ro
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        # deps
+        python3 -m pip install -r requirements.txt
+        # run
+        python3 sample_app.py
+    labels:
+      traefik.enable: true
+      traefik.http.routers.examples_python.rule: Host(`python.examples.test`)
+      traefik.http.services.examples_python.loadbalancer.server.port: 8080
+
+  python_ca:
+    image: python:3.12-alpine
+    networks:
+      proxy:
+    working_dir: /app
+    volumes:
+      - proxy_certs:/certs:ro
+      - ./src:/app:ro
+    environment:
+      CURL_CA_BUNDLE: /certs/ca-bundle.crt
+      SSL_CERT_FILE: /certs/ca-bundle.crt
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        # deps
+        python3 -m pip install -r requirements.txt
+        # run
+        python3 sample_app.py
+    labels:
+      traefik.enable: true
+      traefik.http.routers.examples_python_ca.rule: Host(`python-ca.examples.test`)
+      traefik.http.services.examples_python_ca.loadbalancer.server.port: 8080

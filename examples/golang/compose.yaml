@@ -1,0 +1,48 @@
+networks:
+  proxy:
+    external: true
+
+volumes:
+  proxy_certs:
+    external: true
+
+services:
+  golang:
+    image: golang:1.23-alpine
+    networks:
+      proxy:
+    working_dir: /app
+    volumes:
+      - ./src:/app:ro
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        # run
+        go run sample_app.go
+    labels:
+      traefik.enable: true
+      traefik.http.routers.examples_golang.rule: Host(`golang.examples.test`)
+      traefik.http.services.examples_golang.loadbalancer.server.port: 8080
+
+  golang_ca:
+    image: golang:1.23-alpine
+    networks:
+      proxy:
+    working_dir: /app
+    volumes:
+      - proxy_certs:/certs:ro
+      - ./src:/app:ro
+    environment:
+      # CURL_CA_BUNDLE: /certs/ca-bundle.crt
+      SSL_CERT_FILE: /certs/ca-bundle.crt
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        # run
+        go run sample_app.go
+    labels:
+      traefik.enable: true
+      traefik.http.routers.examples_golang_ca.rule: Host(`golang-ca.examples.test`)
+      traefik.http.services.examples_golang_ca.loadbalancer.server.port: 8080
