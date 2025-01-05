@@ -78,24 +78,31 @@ host and from the container, ensuring efficient and secure communication.
 
 Step-by-step configuration:
 
-1. install `mkcert` root CA on **host**: _(once per setup)_
+1. prepare root CA certificate:
 
-    > **NOTE:** it will ask several times for your password, as it uses `sudo`
+    create and trust `mkcert`-managed CA by **host** trusted stores:
+
+    > **NOTE:** It will ask several times for your password (in CLI and GUI), as it uses `sudo`.
 
     ```console
     $ mkcert -install
     ```
 
-2. generate required `.test` certificates:
+    allow to use **host** root CA:
 
     ```console
-    $ cp "$(mkcert -CAROOT)/rootCA.pem" internal/router/certs/proxy-ca.crt
-
-    $ mkcert -cert-file internal/router/certs/proxy.crt -key-file internal/router/certs/proxy.key \
-      'local.test' '*.local.test' \
-      'examples.test' '*.examples.test' \
-      'my.test' '*.my.test'
+    $ cp "$(mkcert -CAROOT)"/rootCA*.pem certs/
     ```
+
+    > **ALTERNATIVE:** It's possible to run stack without sharing root CA, as it would be auto-generated within `./certs` directory.
+    >
+    > After that, it must be added to host trusted store as:
+    >
+    > ```console
+    > $ CAROOT=./certs mkcert -install
+    > ```
+    >
+    > **NOTE:** Using this approach, root CA must be re-trusted after on  re-create, eg. after cleanup.
 
 1. start `docker compose` stack:
 
@@ -539,13 +546,12 @@ $ HOMEBREW_NO_AUTO_UPDATE=1 \
   brew reinstall ca-certificates
 ```
 
-Verify that it's available:
+Verify that it's properly bundled:
 
 ```console
-$ SUBJECT=$(openssl x509 -noout -subject < "$(mkcert -CAROOT)/RootCA.pem")
+$ SUBJECT=$(openssl x509 -in "$(mkcert -CAROOT)/RootCA.pem" -noout -subject)
 
-$ awk -v decoder='openssl x509 -noout -subject 2>/dev/null' \
-  '/BEGIN/{close(decoder)};{print | decoder}' \
+$ awk -v decoder='openssl x509 -noout -subject 2>/dev/null' '/BEGIN/{close(decoder)};{print | decoder}' \
   < "$(brew --prefix)/etc/ca-certificates/cert.pem" \
   | grep -Fx "${SUBJECT}"
 ```

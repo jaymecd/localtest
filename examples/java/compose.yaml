@@ -41,7 +41,7 @@ services:
       - |
         # import custom CA root
         keytool -cacerts -storepass changeit -list -alias proxy_root_ca >/dev/null 2>&1 \
-          || keytool -cacerts -storepass changeit -importcert -noprompt -file /certs/proxy-ca.crt -alias proxy_root_ca
+          || keytool -cacerts -storepass changeit -importcert -noprompt -file /certs/ca-proxy.crt -alias proxy_root_ca
         # compile
         javac SampleApp.java -d /tmp
         # run

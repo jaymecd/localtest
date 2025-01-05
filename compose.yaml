@@ -10,6 +10,22 @@ volumes:
 
 services:
 
+  mkcert:  # one time job
+    build:
+      context: ./services/mkcert
+    security_opt:
+      - no-new-privileges=true
+    networks:
+      proxy:
+    volumes:
+      - proxy_certs:/certs:rw
+      - ./certs:/certs_ca:rw
+    environment:
+      TLS_PATH_CA: /certs_ca
+      TLS_PATH_CERTS: /certs
+      TLS_SANS_COMMON: local.test *.local.test examples.test *.examples.test my.test *.my.test
+      TLS_SANS_EXTRA: ${TLS_SANS_EXTRA:-}
+
   dnsmasq:
     image: dockurr/dnsmasq:2.90
     restart: unless-stopped
@@ -21,8 +37,8 @@ services:
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:53:53/udp
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:53:53/tcp
     volumes:
-      - ./internal/dns/dnsmasq.conf:/etc/dnsmasq.conf:ro
-    entrypoint: /sbin/tini -- dnsmasq
+      - ./services/dnsmask/dnsmasq.conf:/etc/dnsmasq.conf:ro
+    entrypoint: dnsmasq  # override origin
     command:
       - '--address=/.test/${DOCKER_DEFAULT_IP:-172.17.0.1}'
       - '--address=/.test/::'  # silence IPv6 with loopback
@@ -34,6 +50,8 @@ services:
 
   traefik:
     depends_on:
+      mkcert:
+        condition: service_completed_successfully
       dnsmasq:
         condition: service_healthy
     image: traefik:v3.2.2
@@ -43,24 +61,13 @@ services:
     networks:
       proxy:
     ports:
+      # NOTE: need manually update on entrypoint updates or using compose.override.yaml
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:80:80/tcp
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:443:443/tcp
     volumes:
-      - proxy_certs:/certs
+      - proxy_certs:/certs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./internal/router:/etc/traefik:ro
-    entrypoint:
-      - /bin/sh
-      - -ec
-      - |
-        # update system certificate bundle
-        cp /etc/traefik/certs/proxy-ca.crt /usr/local/share/ca-certificates
-        update-ca-certificates
-        # export ca and bundle for reuse
-        cp /etc/traefik/certs/proxy-ca.crt /certs/proxy-ca.crt
-        cp /etc/ssl/certs/ca-certificates.crt /certs/ca-bundle.crt
-        # start server
-        exec traefik
+      - ./services/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
     healthcheck:
       test: traefik healthcheck
       interval: 5s
@@ -82,8 +89,8 @@ services:
     networks:
       proxy:
     volumes:
-      - ./internal/catchall/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./internal/catchall/public:/var/www:ro
+      - ./services/catchall/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./services/catchall/public:/var/www:ro
     deploy:
       mode: global
     labels:
