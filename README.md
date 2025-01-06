@@ -4,17 +4,27 @@
 
 This solution, powered by a streamlined `docker compose` stack, enables developers to get rid of random ports binding and seamlessly replicate application infrastructures of virtually any complexity using containerized environments and single entrypoint locally.
 
-**Status:** In active development _(breaking changes expected)_
+**Status:** In active development _(breaking changes expected)_ - public name and internal references might change.
 
-> **NOTE:** project public name and internal reference might change.
+> Initial implementation was drafted in November 2017. At that time, I was overwhelmed by managing numerous ports
+> bound to `localhost` and needed a quick (and dirty) solution to address that complexity. It was lame,
+> worked only on macOS and was utilized by two projects I was actively developing. Next year, my focus shifted to cloud
+> infrastructure development, and I forgot about the this project for years - until recently, when I returned to active
+> local development.
+>
+> This time over the winter break of Christmas 2024, I took it seriously - I wanted to unify developer experience,
+> make cross-platform, flexible and easy to use. Plus most important one - do it properly, without quirks
+> and workarounds, like IP alias to localhost. To achieve that, I've researched and tested a lot. And here we are ...
+>
+> -- <cite>Nikolai Zujev</cite>
 
 **List of features:**
 - OS-agnostic (Linux/macOS) developer experience
 - seamless routing on **host** and in **containers** using same IP and FQDNs
 - reserved [.test](https://en.wikipedia.org/wiki/.test) TLD support
-- layer 4 and 7 **load-balancer** with **TLS termination** by `traefik`
-- automated TLS certificate generation by `mkcert`
 - private **DNS nameserver** by `dnsmasq`
+- automated TLS certificate generation with `mkcert`
+- layer 4 and 7 **load-balancer** with **TLS termination** by `traefik`
 - flexible UI to manage `docker` resources by `portainer`
 - configuration customization support
 - framework to auto-wire separate application stacks
