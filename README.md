@@ -730,6 +730,17 @@ There might be few reasons to fail, check one by one:
     If not - check if DNS resolver configured properly.
 
 
+#### Issue: your connection is not private - ERR_CERT_COMMON_NAME_INVALID
+
+There is no **Subject Alternative Name** (SAN) on certificate, that matches current FQDN.
+
+Specify `TLS_SANS_EXTRA=my.custom.test` value using `.env` file to fix this issue.
+
+> **NOTES:**
+> - X.509 wildcard only go one level deep - `*.*.local.test` won't match `a.b.local.test`
+> - X.509 wildcard on TLD level is not allowed - `*.test` won't be recognized
+
+
 #### Issue: [macOS] could not open `.test` URL - ERR_ADDRESS_UNREACHABLE
 
 **macOS** puts extra _(imo useless)_ security measures for non-native apps to restrict access to local CIDR blocks.
