@@ -54,7 +54,8 @@ services:
         condition: service_completed_successfully
       dnsmasq:
         condition: service_healthy
-    image: traefik:v3.2.2
+    build:
+      context: ./services/traefik
     restart: unless-stopped
     security_opt:
       - no-new-privileges=true
@@ -67,7 +68,6 @@ services:
     volumes:
       - proxy_certs:/certs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./services/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
     healthcheck:
       test: traefik healthcheck
       interval: 5s

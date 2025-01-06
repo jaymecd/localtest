@@ -2,7 +2,7 @@
 
 [[ "${1:-}" == "generate-certificates" ]] || {
     # NOTE: no need to exit as exec takes ownership and code below does not run
-    exec -- "$@"
+    exec "$@"
 }
 
 set -euo pipefail
