@@ -3,7 +3,7 @@ global:
   sendAnonymousUsage: false
 
 log:
-  level: DEBUG
+  level: ${TRAEFIK_LOG_LEVEL}
 
 accesslog: {}
 

@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-[[ "${1:-}" == "generate-certificates" ]] || {
-    # NOTE: no need to exit as exec takes ownership and code below does not run
-    exec "$@"
-}
-
 set -euo pipefail
 
 fatal() {

@@ -27,7 +27,8 @@ services:
       TLS_SANS_EXTRA: ${TLS_SANS_EXTRA:-}
 
   dnsmasq:
-    image: dockurr/dnsmasq:2.90
+    build:
+      context: ./services/dnsmasq
     restart: unless-stopped
     security_opt:
       - no-new-privileges=true
@@ -36,27 +37,20 @@ services:
     ports:
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:53:53/udp
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:53:53/tcp
-    volumes:
-      - ./services/dnsmask/dnsmasq.conf:/etc/dnsmasq.conf:ro
-    entrypoint: dnsmasq  # override origin
     command:
-      - '--address=/.test/${DOCKER_DEFAULT_IP:-172.17.0.1}'
+      - --filter-AAAA
+      - --address=/.test/${DOCKER_DEFAULT_IP:-172.17.0.1}
       - '--address=/.test/::'  # silence IPv6 with loopback
-    healthcheck:
-      test: 'test -n "$(netstat -nltu | grep -F :53)"'
-      interval: 5s
-      timeout: 1s
-      retries: 3
 
   traefik:
+    build:
+      context: ./services/traefik
+    restart: unless-stopped
     depends_on:
       mkcert:
         condition: service_completed_successfully
       dnsmasq:
         condition: service_healthy
-    build:
-      context: ./services/traefik
-    restart: unless-stopped
     security_opt:
       - no-new-privileges=true
     networks:
@@ -68,31 +62,26 @@ services:
     volumes:
       - proxy_certs:/certs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    healthcheck:
-      test: traefik healthcheck
-      interval: 5s
-      timeout: 1s
-      retries: 3
+    environment:
+      TRAEFIK_LOG_LEVEL: ${TRAEFIK_LOG_LEVEL:-}
     labels:
       traefik.enable: true
-      # local_router
-      traefik.http.routers.local_router.service: api@internal  # bind to traefik API
-      traefik.http.routers.local_router.rule: Host(`router.local.test`)
-      traefik.http.services.local_router.loadbalancer.server.port: 80
+      # local_traefik
+      traefik.http.routers.local_traefik.service: api@internal  # bind to traefik API
+      traefik.http.routers.local_traefik.rule: Host(`traefik.local.test`)
+      traefik.http.services.local_traefik.loadbalancer.server.port: 80
 
   catchall:
+    build:
+      context: ./services/catchall
+    restart: unless-stopped
     depends_on:
       traefik:
         condition: service_healthy
-    image: caddy:2.8.4-alpine
-    restart: unless-stopped
+    security_opt:
+      - no-new-privileges=true
     networks:
       proxy:
-    volumes:
-      - ./services/catchall/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./services/catchall/public:/var/www:ro
-    deploy:
-      mode: global
     labels:
       traefik.enable: true
       # local_homepage
@@ -100,7 +89,7 @@ services:
       traefik.http.routers.local_homepage.rule: Host(`local.test`) || Path(`/favicon.ico`)
       traefik.http.routers.local_homepage.middlewares: local_homepage
       traefik.http.services.local_homepage.loadbalancer.server.port: 80
-      traefik.http.middlewares.local_homepage.addprefix.prefix: /start
+      traefik.http.middlewares.local_homepage.addprefix.prefix: /homepage
       # local_catch_undefined
       traefik.http.routers.local_catch_undefined.service: local_catch_undefined
       traefik.http.routers.local_catch_undefined.rule: Host(`local.test`) || Path(`/`)
@@ -112,11 +101,13 @@ services:
       traefik.http.middlewares.local_catch_undefined.errors.query: /404/undefined.html
 
   portainer:
+    image: portainer/portainer:1.25.0-alpine  # NOTE: v2 does not allow [no-auth]
+    restart: unless-stopped
     depends_on:
       traefik:
         condition: service_healthy
-    image: portainer/portainer:1.25.0-alpine  # NOTE: v2 does not allow [no-auth]
-    restart: unless-stopped
+    security_opt:
+      - no-new-privileges=true
     networks:
       proxy:
     command:
@@ -127,17 +118,19 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
       traefik.enable: true
-      # local_docker
-      traefik.http.routers.local_docker.service: local_docker
-      traefik.http.routers.local_docker.rule: Host(`docker.local.test`)
-      traefik.http.services.local_docker.loadbalancer.server.port: 9000
+      # local_portainer
+      traefik.http.routers.local_portainer.service: local_portainer
+      traefik.http.routers.local_portainer.rule: Host(`portainer.local.test`)
+      traefik.http.services.local_portainer.loadbalancer.server.port: 9000
 
   whoami:
+    image: traefik/whoami:v1.10.3
+    restart: unless-stopped
     depends_on:
       traefik:
         condition: service_healthy
-    image: traefik/whoami:v1.10.3
-    restart: unless-stopped
+    security_opt:
+      - no-new-privileges=true
     networks:
       proxy:
     scale: 2
