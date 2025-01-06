@@ -104,9 +104,11 @@ Step-by-step configuration:
     >
     > **NOTE:** Using this approach, root CA must be re-trusted after on  re-create, eg. after cleanup.
 
-1. start `docker compose` stack:
+1. build and start `docker compose` stack:
 
     ```console
+    $ docker compose build
+
     $ docker compose up --wait
     ```
 
@@ -148,6 +150,8 @@ $ docker network inspect bridge --format='{{(index .IPAM.Config 0).Gateway}}'
 ### Setup: configuration override
 
 Certain properties could be overridden using `.env` file.
+
+Inspect [.env.dist](.env.dist) file for possible override properties.
 
 1. make a copy of `.env.dist` file:
 
