@@ -1,20 +1,25 @@
 # Local development with docker
 
-This project provides `docker compose` stack and a framework for local development with `docker`.
+**Objective:** Elevate Developer Experience (DX) for local development with `docker` by enabling `.test` FQDNs with TLS support and services auto-wire.
 
-**Status:** In Development _(with promise to reduce breaking changes to a minimum)_
+This solution, powered by a streamlined `docker compose` stack, enables developers to get rid of random ports binding and seamlessly replicate application infrastructures of virtually any complexity using containerized environments and single entrypoint locally.
+
+**Status:** In active development _(breaking changes expected)_
+
+> **NOTE:** project public name and internal reference might change.
 
 **List of features:**
 - OS-agnostic (Linux/macOS) developer experience
 - seamless routing on **host** and in **containers** using same IP and FQDNs
 - reserved [.test](https://en.wikipedia.org/wiki/.test) TLD support
 - layer 4 and 7 **load-balancer** with **TLS termination** by `traefik`
+- automated TLS certificate generation by `mkcert`
 - private **DNS nameserver** by `dnsmasq`
 - flexible UI to manage `docker` resources by `portainer`
+- configuration customization support
 - framework to auto-wire separate application stacks
+- full offline support, except for the initial run
 - various examples and more ...
-
-And everything is done using just containers!
 
 ```mermaid
 graph LR
