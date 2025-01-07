@@ -39,7 +39,7 @@ mkdir -p "${TLS_PATH_CA}" "${TLS_PATH_CERTS}"
 
 export CAROOT="${TLS_PATH_CA}" TRUST_STORES="system"
 
-if [[ ! -f "${TLS_PATH_CA}/rootCA.pem" || ! -f "${TLS_PATH_CA}/rootCA-key.pem" ]]; then
+if [[ ! -s "${TLS_PATH_CA}/rootCA.pem" || ! -s "${TLS_PATH_CA}/rootCA-key.pem" ]]; then
     # both files are required
     ( cd "${TLS_PATH_CA}" && rm -f rootCA*.pem )
 fi
@@ -59,7 +59,7 @@ awk -v decoder='openssl x509 -noout -subject 2>/dev/null' '/BEGIN/{close(decoder
     | grep -qFx "${SUBJECT}" \
     || fatal "local CA certificate is not bundled"
 
-if [[ -f "${TLS_PATH_CERTS}/checksums.sha256" ]]; then
+if [[ -s "${TLS_PATH_CERTS}/checksums.sha256" ]]; then
     echo "Verifying existing checksums ..."
 
     if sha256sum -c "${TLS_PATH_CERTS}/checksums.sha256" 2>/dev/null | sed -e 's/^/  /'; then

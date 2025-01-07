@@ -12,9 +12,12 @@ This solution, powered by a streamlined `docker compose` stack, enables develope
 > infrastructure development, and I forgot about the this project for years - until recently, when I returned to active
 > local development.
 >
-> This time over the winter break of Christmas 2024, I took it seriously - I wanted to unify developer experience,
-> make cross-platform, flexible and easy to use. Plus most important one - do it properly, without quirks
-> and workarounds, like IP alias to localhost. To achieve that, I've researched and tested a lot. And here we are ...
+> This time over the winter break of Christmas 2024, I took it seriously - I want to have standalone & ready to work
+> offline solution, unify developer experience cross platforms, make it flexible and easy to use.
+> Plus most important one - do it properly, without quirks and partial workarounds.
+>
+> So I've started research and testing - many existing solutions on the internet are partially working and din't satisfy
+> my needs. So I tried to put best of OSS tools to solve the problem. And here we are ...
 >
 > -- <cite>Nikolai Zujev</cite>
 
@@ -28,7 +31,7 @@ This solution, powered by a streamlined `docker compose` stack, enables develope
 - flexible UI to manage `docker` resources by `portainer`
 - configuration customization support
 - framework to auto-wire separate application stacks
-- full offline support, except for the initial run
+- full **offline** support, except for the initial build & run
 - various examples and more ...
 
 ```mermaid
@@ -103,7 +106,7 @@ Step-by-step configuration:
     $ mkcert -install
     ```
 
-    allow to use **host** root CA:
+    copy (not symlink) **host** root CA:
 
     ```console
     $ cp "$(mkcert -CAROOT)"/rootCA*.pem certs/
@@ -247,14 +250,16 @@ Running `docker` on **macOS** relies on an intermediate **docker VM** and a bit 
 
   - [Rancher Desktop](https://docs.rancherdesktop.io)
     - **vz** [rootless, privileged]: OK
-    - **qemu** [rootless]: FAIL - no routing, host DNS resolver is not reachable
+    - **qemu** [rootless]: OK/FAIL - if not using `automated routing` method below
     - **qemu** [privileged]: OK
 
     > **NOTE:** `privileged` consumes extra IP from the router, while `rootless` uses NAT
 
   - [colima](https://github.com/abiosoft/colima)
-    - **qemu** [rootless, privileged]: OK, if started using `--network-address` flag
-    - **vz** [rootless, privileged]: OK, if started using `--network-address` flag
+    - **qemu** [rootless, privileged]: OK
+    - **vz** [rootless, privileged]: OK
+
+    > **NOTE:** start VM with `--network-address` flag, if not using `automated routing` method below
 
   - [lima](https://github.com/lima-vm/lima)
     - not tested directly
@@ -325,7 +330,8 @@ This method binds exposed ports of `traefik` and `dnsmasq` containers directly t
 - not affected by OS restart
 
 **Cons:**
-- no auto-detect for **docker VM** IP - must be explicitly detected
+- **docker VM** must have dedicated routable IP, eg. `192.168.205.x`
+- **docker VM** IP considered ephemeral and must be explicitly detected
 - requires `DOCKER_DEFAULT_IP` override using `.env` file
 - won't survive **docker VM** recreation with IP change - must re-configure
 
@@ -379,6 +385,7 @@ This method adds static route to default docker IP using **docker VM** IP as gat
 - no docker default IP override by default
 
 **Cons:**
+- **docker VM** must have dedicated routable IP, eg. `192.168.205.x`
 - **docker VM** IP considered ephemeral and must be explicitly detected
 - static routing - 1 rule per 1 CIDR
 - route will be lost on **host** restart - must define service to auto-start
@@ -457,7 +464,7 @@ For more details please refer to the original documentation.
 **Pros:**
 - provides auto-discovery for docker subnets
 - automated routing management
-- no need to detect **docker VM** IP
+- **docker VM** might not have dedicated routable IP
 - `homebrew` provides default service to auto-start
 - good for dynamic/experimental setup
 - no overrides by default
