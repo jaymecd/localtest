@@ -314,7 +314,13 @@ Step-by-step configuration:
     $ sudo killall -HUP mDNSResponder
     ```
 
-> **NOTE:** `.test` FQDNs won't be resolved unless routing setup is completed.
+1. verify DNS resolver is registered:
+
+    > **NOTE:** `.test` FQDNs won't be resolved unless routing setup is completed.
+
+    ```shell
+    $ scutil --dns | grep -A4 -B1 test
+    ```
 
 ---
 
