@@ -103,7 +103,10 @@ services:
       traefik.http.middlewares.local_catch_undefined.errors.query: /404/undefined.html
 
   portainer:
-    image: portainer/portainer:1.25.0-alpine  # NOTE: v2 does not allow [no-auth]
+    build:
+      context: ./services/portainer
+      args:
+        PORTAINER_VERSION: ${PORTAINER_VERSION:-2.33.1}
     restart: unless-stopped
     depends_on:
       traefik:
@@ -113,9 +116,9 @@ services:
     networks:
       proxy:
     command:
-      - --no-auth
-      - --no-analytics
       - --host=unix:///var/run/docker.sock
+    environment:
+      ADMIN_PASS: admin
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
