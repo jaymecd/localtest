@@ -369,15 +369,15 @@ Step-by-step configuration:
     ```console
         - either for Rancher Desktop -
 
-    sudo ln -nfs ~/.rd/docker.sock /var/run/docker.sock
+    $ sudo ln -nfs ~/.rd/docker.sock /var/run/docker.sock
 
-        - or for colima with default profile -
+        - or for colima with 'default' profile -
 
-    sudo ln -nfs ~/.colima/docker.sock /var/run/docker.sock
+    $ sudo ln -nfs ~/.colima/docker.sock /var/run/docker.sock
 
-        - or for colima with NAME profile -
+        - or for colima with 'NAME' profile -
 
-    sudo ln -nfs ~/.colima/<NAME>/docker.sock /var/run/docker.sock
+    $ sudo ln -nfs ~/.colima/NAME/docker.sock /var/run/docker.sock
     ```
 
 1. start `docker-mac-net-connect` service:
