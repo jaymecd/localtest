@@ -1,36 +1,47 @@
 # Local development with docker
 
-**Objective:** Elevate Developer Experience (DX) for local development with `docker` by enabling `.test` FQDNs with TLS support and services auto-wire.
+**Objective:** Elevate Developer Experience (DX) for local development with `docker`
+by enabling `.test` FQDNs with TLS support and services auto-wire using labels.
 
-This solution, powered by a streamlined `docker compose` stack, enables developers to get rid of random ports binding and seamlessly replicate application infrastructures of virtually any complexity using containerized environments and single entrypoint locally.
+This solution, built on a streamlined `docker compose` stack, eliminates the need for random port bindings
+and allows developers to replicate application infrastructures of nearly any complexity locally,
+with containerized environments and a single entry point.
 
-**Status:** In active development _(breaking changes expected)_ - public name and internal references might change.
+**Status:** In active development
 
-> Initial implementation was drafted in November 2017. At that time, I was overwhelmed by managing numerous ports
-> bound to `localhost` and needed a quick (and dirty) solution to address that complexity. It was lame,
-> worked only on macOS and was utilized by two projects I was actively developing. Next year, my focus shifted to cloud
-> infrastructure development, and I forgot about the this project for years - until recently, when I returned to active
-> local development.
+**Rationale:**
+
+> Back in November 2017, I ran into a common challenge: how to make my local development environment behave
+> like production with encryption-in-transit and proper host names.
+> At the time, I was juggling multiple random ports bound to localhost, eventually causing collision on desired ports.
 >
-> This time over the winter break of Christmas 2024, I took it seriously - I want to have standalone & ready to work
-> offline solution, unify developer experience cross platforms, make it flexible and easy to use.
-> Plus most important one - do it properly, without quirks and partial workarounds.
+> My first attempt was rough — MacOS-only. It wasn’t elegant, but it served its purpose, as I was working only on 2 projects.
+> Later, my attention shifted to cloud infrastructure, and this issue faded away.
 >
-> So I've started research and testing - many existing solutions on the internet are partially working and din't satisfy
-> my needs. So I tried to put best of OSS tools to solve the problem. And here we are ...
+> By Christmas 2024, I found myself returning to local web development. The old approach no longer felt sufficient.
+>
+> I narrowed it down to a simple set of requirements. The solution should:
+> - be effortless for any developer to run.
+> - work fully offline, as a self-contained setup.
+> - provide consistency across different platforms.
+> - stay flexible, without hidden quirks or half-measures.
+>
+> After time of researching and testing, I've eventually put together a combination of open-source tools that felt stable and practical.
+>
+> It’s not perfect, but it’s a cleaner, more reliable way to bring local development closer to production.
 >
 > -- <cite>Nikolai Zujev</cite>
 
 **List of features:**
 - OS-agnostic (Linux/macOS) developer experience
-- seamless routing on **host** and in **containers** using same IP and FQDNs
+- seamless routing on **host** and in **containers** using same FQDNs
 - reserved [.test](https://en.wikipedia.org/wiki/.test) TLD support
 - private **DNS nameserver** by `dnsmasq`
 - automated TLS certificate generation with `mkcert`
 - layer 4 and 7 **load-balancer** with **TLS termination** by `traefik`
 - flexible UI to manage `docker` resources by `portainer`
 - configuration customization support
-- framework to auto-wire separate application stacks
+- framework to auto-wire separate application stacks using docker labels
 - full **offline** support, except for the initial build & run
 - various examples and more ...
 
@@ -96,9 +107,9 @@ host and from the container, ensuring efficient and secure communication.
 
 Step-by-step configuration:
 
-1. prepare root CA certificate:
+1. prepare Root CA certificate:
 
-    create and trust `mkcert`-managed CA by **host** trusted stores:
+    Create and trust `mkcert`-managed CA by **host** trusted stores:
 
     > **NOTE:** It will ask several times for your password (in CLI and GUI), as it uses `sudo`.
 
@@ -106,21 +117,22 @@ Step-by-step configuration:
     $ mkcert -install
     ```
 
-    copy (not symlink) **host** root CA:
+    Copy (symlink not accessible from container) **host Root CA** and adjust permissions:
 
     ```console
     $ cp "$(mkcert -CAROOT)"/rootCA*.pem certs/
+    $ chmod 0400 certs/rootCA*.pem
     ```
 
-    > **ALTERNATIVE:** It's possible to run stack without sharing root CA, as it would be auto-generated within `./certs` directory.
-    >
-    > After that, it must be added to host trusted store as:
-    >
-    > ```console
-    > $ CAROOT=./certs mkcert -install
-    > ```
-    >
-    > **NOTE:** Using this approach, root CA must be re-trusted after on  re-create, eg. after cleanup.
+    > **NOTE:** fix `permission denied` error by adjusting permissions `chmod +w certs/rootCA*.pem` command.
+
+    **Alternative setup:**
+
+    It's possible to reuse custom **Root CA** from `./certs` directory. However, these **Root CA** must be re-trusted once they've changed.
+
+    ```console
+    $ CAROOT=./certs mkcert -install
+    ```
 
 1. build and start `docker compose` stack:
 
@@ -145,7 +157,7 @@ Step-by-step configuration:
 
 1. visit http://local.test to kickstart your developer experience
 
-    Explore examples and guides to help you make the most of this project.
+    Explore [examples/](./examples/) code to get inspiration for customization.
 
 1. celebrate, share your experience and report findings
 
@@ -159,11 +171,12 @@ Detect configured default docker IP:
 
 ```console
 $ docker network inspect bridge --format='{{(index .IPAM.Config 0).Gateway}}'
+172.17.0.1
 ```
 
-> **NOTE:** If no match - use [configuration override](#setup-configuration-override) to match it and update code snippets before running.
+**Host OS** uses custom DNS resolver to send traffic to `172.17.0.1` IP to resolve `*.test` host names using nameserver running in docker.
 
-**Host** uses custom DNS resolver to resolve `.test` FQDNs using `172.17.0.1` nameserver, that is inherited by **docker**.
+> **NOTE:** If IP does not match - use [configuration override](#setup-configuration-override) approach, to tune setup.
 
 ### Setup: configuration override
 
@@ -177,7 +190,7 @@ Inspect [.env.dist](.env.dist) file for possible override properties.
     $ cp .env.dist .env
     ```
 
-    > **NOTE:** file `.env` is git-ignored
+    > **NOTE:** file `.env` **MUST** be git-ignored
 
 1. uncomment and adjust envvars to your needs
 
@@ -185,7 +198,7 @@ Inspect [.env.dist](.env.dist) file for possible override properties.
 
     ```console
     $ docker compose down
-    $ docker composer up --wait
+    $ docker composer up --wait --build
     ```
 ---
 
@@ -238,39 +251,30 @@ Running `docker` on **macOS** relies on an intermediate **docker VM** and a bit 
 - there is no `docker0` network interface
 - no route to `172.17.0.1` IP address by default
 - once network is disconnected or switched off, non-localhost DNS traffic is denied
-- use `vz` virtualization with `virtiofs` and `rosetta` options for **docker VM** running on **Apple Silicon**
-- using network alias for routing, eg. `ifconfig lo0 alias 10.254.254.254`, is error prone and should not be used
-- **docker VM** MUST be bi-directionally reachable via dedicated IP address, eg. `192.168.205.x`
+- prefer using `vz` virtualization with `virtiofs` and `rosetta` options for **docker VM** running on **Apple Silicon**
+- network alias, such as `ifconfig lo0 alias 10.254.254.254` is error prone and should not be used
 - **docker VM** is managed by one of:
 
-    > **NOTE:** run ONE **docker VM** at a time to avoid unexpected networking issues.
-
   - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-    - not yet tested
+    - not yet fully tested
 
   - [Rancher Desktop](https://docs.rancherdesktop.io)
     - **vz** [rootless, privileged]: OK
-    - **qemu** [rootless]: OK/FAIL - if not using `automated routing` method below
+    - **qemu** [rootless]: OK
     - **qemu** [privileged]: OK
 
     > **NOTE:** `privileged` consumes extra IP from the router, while `rootless` uses NAT
 
   - [colima](https://github.com/abiosoft/colima)
-    - **qemu** [rootless, privileged]: OK
-    - **vz** [rootless, privileged]: OK
+    - **qemu** [rootless]: OK
+    - **vz** [rootless]: OK
 
-    > **NOTE:** start VM with `--network-address` flag, if not using `automated routing` method below
+    > **NOTE:** run only ONE **docker VM** to avoid unexpected networking issues.
 
-  - [lima](https://github.com/lima-vm/lima)
-    - not tested directly
-
-Required **host** adjustments:
+Required **macOS** host adjustments:
 
 1. setup [DNS resolver and proxy](#setup-macos--dns-resolver-and-proxy)
-1. setup one of routing methods:
-    - [docker VM IP](#setup-macos--routing--docker-vm-ip)
-    - [static routing](#setup-macos--routing--static)
-    - [automated routing](#setup-macos--routing--automation)
+1. setup [docker routing](#setup-macos--docker-routing)
 1. bundle [Root CA certificate](#setup-macos--root-ca-certificate)
 
 ---
@@ -324,143 +328,8 @@ Step-by-step configuration:
 
 ---
 
-#### Setup: macOS / routing / docker VM IP
 
-This method binds exposed ports of `traefik` and `dnsmasq` containers directly to **docker VM** IP address.
-
-**Pros:**
-- easy to start
-- simplest approach
-- good for static setup
-- no routing to manage
-- not affected by OS restart
-
-**Cons:**
-- **docker VM** must have dedicated routable IP, eg. `192.168.205.x`
-- **docker VM** IP considered ephemeral and must be explicitly detected
-- requires `DOCKER_DEFAULT_IP` override using `.env` file
-- won't survive **docker VM** recreation with IP change - must re-configure
-
-Step-by-step configuration:
-
-1. detect IP address of **docker VM**:
-
-    - [Rancher-Desktop](#issue-detect-ip-address-of-rancher-desktop-vm)
-    - [colima](#issue-detect-ip-address-of-colima-vm)
-
-    Eg, assume it is `192.168.205.2`
-
-1. add or update following line to `.env` file:
-
-    ```ini
-    DOCKER_DEFAULT_IP=192.168.205.2
-    ```
-
-1. recreate `docker compose` stack:
-
-    ```console
-    $ docker compose down
-    $ docker composer up --wait
-    ```
-
-1. replace `.test` server IP with **docker VM** IP for DNS proxy and validate:
-
-    ```console
-    $ sed -i -e '/^server=/s,.test/.*,.test/192.168.205.2,' "$(brew --prefix)/etc/dnsmasq.d/proxy.conf"
-
-    $ dnsmasq --test
-    ```
-
-1. restart DNS proxy server and reset cache:
-
-    ```console
-    $ sudo brew services restart dnsmasq
-    $ sudo killall -HUP mDNSResponder
-    ```
-
----
-
-#### Setup: macOS / routing / static
-
-This method adds static route to default docker IP using **docker VM** IP as gateway.
-
-**Pros:**
-- easy to start
-- simple approach
-- good for static setup
-- no docker default IP override by default
-
-**Cons:**
-- **docker VM** must have dedicated routable IP, eg. `192.168.205.x`
-- **docker VM** IP considered ephemeral and must be explicitly detected
-- static routing - 1 rule per 1 CIDR
-- route will be lost on **host** restart - must define service to auto-start
-- route will be lost on **docker VM** restart - must re-run service
-- manual cleanup needed
-
-Step-by-step configuration:
-
-1. detect **docker VM** IP address for your setup:
-
-    - [Rancher-Desktop](#issue-how-to-detect-ip-address-of-rancher-desktop-vm)
-    - [colima](#issue-how-to-detect-ip-address-of-colima-vm)
-
-    Eg, assume it is `192.168.205.2`
-
-1. create `local.test-docker-route` service file:
-
-    ```console
-    $ cat <<EOF | sudo tee /Library/LaunchDaemons/local.test-docker-route.plist
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    <plist version="1.0">
-      <dict>
-          <key>Label</key>
-          <string>local.test-docker-route</string>
-          <key>RunAtLoad</key>
-          <true/>
-          <key>ProgramArguments</key>
-          <array>
-              <string>/sbin/route</string>
-              <string>-n</string>
-              <string>add</string>
-              <string>-net</string>
-              <string>172.17.0.1/32</string>
-              <string>192.168.205.2</string>
-          </array>
-      </dict>
-    </plist>
-    EOF
-
-    $ plutil -lint /Library/LaunchDaemons/local.test-docker-route.plist
-
-    $ sudo chown root:wheel /Library/LaunchDaemons/local.test-docker-route.plist
-    $ sudo chmod 644 /Library/LaunchDaemons/local.test-docker-route.plist
-    ```
-
-1. start `local.test-docker-route` service and verify routing table:
-
-    ```console
-    $ sudo launchctl load -w /Library/LaunchDaemons/local.test-docker-route.plist
-    ```
-
-1. verify routing table contains `172.17.0.1` record:
-
-    ```console
-    $ netstat -rnf inet
-    ```
-
-> **NOTE:** `launchctl unload` DOES NOT remove route, this has to be done manually
->
-> ```console
-> $ sudo launchctl unload /Library/LaunchDaemons/local.test-docker-route.plist
->
-> $ sudo route delete 172.17.0.1
-> ```
-
----
-
-#### Setup: macOS / routing / automation
+#### Setup: macOS / docker routing
 
 This method uses [chipmk/docker-mac-net-connect](https://github.com/chipmk/docker-mac-net-connect/) binary
 to create a tunnel to **docker VM** and automatically manage routing rules to **docker** subnets.
@@ -476,10 +345,9 @@ For more details please refer to the original documentation.
 - no overrides by default
 
 **Cons:**
-- additional dependency to manage
-- uses `10.33.33.1` IP on **host** for tunnel interface, possible collisions on VPN
-- uses privileged docker socket at `/var/run/docker.sock` by default
-- rootless socket could be used either as symlink to privileged one, or by customizing `homebrew` service with `DOCKER_HOST` envvar
+- might have collision on `10.33.33.1` IP with VPN, it's used for tunnel interface
+- uses privileged docker socket `/var/run/docker.sock` by default
+    - if it's missing, rootless socket (eg. `~/.colima/docker.sock`) have be symlinked manually
 
 Step-by-step configuration:
 
@@ -487,6 +355,29 @@ Step-by-step configuration:
 
     ```console
     $ brew install chipmk/tap/docker-mac-net-connect
+    ```
+
+1. verify privileged docker socket exists:
+
+    ```console
+    $ ls -l /var/run/docker.sock
+    /var/run/docker.sock -> /Users/nzujev/.colima/docker.sock
+    ```
+
+    Fix `No such file or directory` error or wrong target with:
+
+    ```console
+        - either for Rancher Desktop -
+
+    sudo ln -nfs ~/.rd/docker.sock /var/run/docker.sock
+
+        - or for colima with default profile -
+
+    sudo ln -nfs ~/.colima/docker.sock /var/run/docker.sock
+
+        - or for colima with NAME profile -
+
+    sudo ln -nfs ~/.colima/<NAME>/docker.sock /var/run/docker.sock
     ```
 
 1. start `docker-mac-net-connect` service:
@@ -535,34 +426,20 @@ Step-by-step configuration:
     ...
     ```
 
-    Could be fixed using one of the following methods:
-    - configure **docker VM** to create privileged docker socket _(see Rancher-Desktop issue)_
-    - symlink user docker socket to the privileged socket path.
-
-        ```console
-        sudo ln -nfs ~/.rd/docker.sock /var/run/docker.sock
-
-          - or -
-
-        sudo ln -nfs ~/.colima/<NAME>/docker.sock /var/run/docker.sock
-        ```
-
-    - customize plist service to utilize `DOCKER_HOST` envvar with correct endpoint from `docker context ls` command.
+    This error could be fixed using one of the following methods:
+    - configure **docker VM** to create privileged docker socket _(see Rancher-Desktop issue)_.
+    - symlink user docker socket to the privileged socket path _(see above)_.
+    - (advanced, not covered here) customize plist service to utilize `DOCKER_HOST` envvar with correct endpoint from `docker context ls` command.
 
     </details>
-
-    > **NOTE:** after successful setup, **docker VM** will have new `chip0` interface.
 
 1. verify routing table contains `172.17` record:
 
     ```console
-    $ netstat -rnf inet
+    $ netstat -rnf inet | grep 172
     ```
 
-> **NOTE:** `lima`-based VM might require extra `iptables` rule - see [chipmk/docker-mac-net-connect#26](https://github.com/chipmk/docker-mac-net-connect/issues/26#issuecomment-1565238036) for details.
-
 ---
-
 
 #### Setup: macOS / root CA certificate
 
@@ -581,7 +458,7 @@ $ HOMEBREW_NO_AUTO_UPDATE=1 \
 Verify that it's properly bundled:
 
 ```console
-$ SUBJECT=$(openssl x509 -in "$(mkcert -CAROOT)/RootCA.pem" -noout -subject)
+$ SUBJECT=$(openssl x509 -in "$(mkcert -CAROOT)/RootCA.pem" -noout -subject | tee /dev/stderr)
 
 $ awk -v decoder='openssl x509 -noout -subject 2>/dev/null' '/BEGIN/{close(decoder)};{print | decoder}' \
   < "$(brew --prefix)/etc/ca-certificates/cert.pem" \
@@ -681,38 +558,6 @@ After host system is configured, `.test` FQDNs must be resolved and accessible f
 
 ### Setup: troubleshooting
 
-#### Issue: how to detect IP address of `Rancher-Desktop` VM?
-
-IP address could be discovered from `rd1` or `vznat` network interfaces using `rdctl` CLI tool.
-
-Usually it's `192.168.205.2`.
-
-```console
-$ rdctl shell ls -1 /sys/class/net \
-  | grep -E '^(rd1|vznat)$' \
-  | xargs -I{} -r -- rdctl shell ip addr show dev {} \
-  | awk '/inet / {print $2}' \
-  | cut -d/ -f1
-```
-
-#### Issue: how to detect IP address of `colima` VM?
-
-IP address could be discovered using `colima` CLI tool or from `col0` network interface.
-
-Usually it's one of `192.168.205.x`.
-
-for `default` instance:
-
-```console
-$ colima list -j | jq -r .address
-```
-
-for `MY_NAME` instance:
-
-```console
-$ colima list -j -p MY_NAME | jq -r .address
-```
-
 #### Issue: could not resolve `.test` host - ERR_NAME_NOT_RESOLVED
 
 There might be few reasons to fail, check one by one:
@@ -721,16 +566,15 @@ There might be few reasons to fail, check one by one:
 
     If not - start or recreate the stack.
 
-1. check if configured `DOCKER_DEFAULT_IP` is reachable:
+1. check if IP configured via `DOCKER_DEFAULT_IP` envvar is reachable:
 
     ```console
-    $ _TARGET_IP=$( source .env 2>/dev/null || :; echo "${DOCKER_DEFAULT_IP:-172.17.0.1}")
-    $ echo "${_TARGET_IP}"
+    $ _TARGET_IP=$( source .env 2>/dev/null || :; echo "${DOCKER_DEFAULT_IP:-172.17.0.1}" | tee /dev/stderr)
 
     $ ping -c1 "${_TARGET_IP}"
     ```
 
-    If not - check if `_TARGET_IP` is correct, routing is configured, firewall is not blocking, **docker VM** has dedicated IP.
+    If not - check if `_TARGET_IP` is correct, routing is configured and firewall is not blocking.
 
 1. check if `.test` FQDN is resolved using configured `DOCKER_DEFAULT_IP`
 
