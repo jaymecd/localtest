@@ -1,4 +1,6 @@
-FROM traefik:v3.2.2
+ARG TRAEFIK_VERSION=configured_via_composer
+
+FROM traefik:${TRAEFIK_VERSION}
 
 RUN apk add --no-cache inotify-tools tini
 

@@ -45,6 +45,8 @@ services:
   traefik:
     build:
       context: ./services/traefik
+      args:
+        TRAEFIK_VERSION: ${TRAEFIK_VERSION:-v3.5.2}
     restart: unless-stopped
     depends_on:
       mkcert:
