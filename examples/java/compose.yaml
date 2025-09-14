@@ -39,13 +39,29 @@ services:
       - /bin/sh
       - -ec
       - |
-        # import custom CA root
-        keytool -cacerts -storepass changeit -list -alias proxy_root_ca >/dev/null 2>&1 \
-          || keytool -cacerts -storepass changeit -importcert -noprompt -file /certs/ca-proxy.crt -alias proxy_root_ca
+        set -x
+
+        # convert custom CA root to p12
+        keytool -importcert \
+          -file /certs/ca-proxy.crt \
+          -keystore /tmp/truststore.p12 \
+          -storepass truststore \
+          -alias my-ca \
+          -noprompt
+
+        keytool -list \
+          -keystore /tmp/truststore.p12 \
+          -storepass truststore
+
         # compile
         javac SampleApp.java -d /tmp
+
         # run
-        java -cp /tmp SampleApp
+        java -cp /tmp \
+          -Djavax.net.ssl.trustStore=/tmp/truststore.p12 \
+          -Djavax.net.ssl.trustStorePassword=truststore \
+          -Djdk.tls.client.protocols=TLSv1.2 \
+          SampleApp
     labels:
       traefik.enable: true
       traefik.http.routers.examples_java_ca.rule: Host(`java-ca.examples.test`)

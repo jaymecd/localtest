@@ -31,6 +31,8 @@ public class SampleApp {
                 public void handle(HttpExchange exchange) throws IOException {
                     String iso8601 = ZonedDateTime.now().format(formatter);
 
+                    System.out.println("request ...");
+
                     String response = "Hi, I'm Java/" + version + " service running on '" + hostname + "' host.\n\n";
                     response += "Time is " + iso8601 + "\n\n";
                     response += "Rendering " + remoteUrl + " page\n";
