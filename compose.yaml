@@ -88,11 +88,13 @@ services:
     labels:
       traefik.enable: true
       # local_homepage
+      traefik.http.routers.local_homepage.service: local_homepage
       traefik.http.routers.local_homepage.rule: Host(`local.test`) || Path(`/favicon.ico`)
       traefik.http.routers.local_homepage.middlewares: local_homepage
       traefik.http.services.local_homepage.loadbalancer.server.port: 80
       traefik.http.middlewares.local_homepage.addprefix.prefix: /homepage
       # local_catch_undefined
+      traefik.http.routers.local_catch_undefined.service: local_catch_undefined
       traefik.http.routers.local_catch_undefined.rule: Host(`local.test`) || Path(`/`)
       traefik.http.routers.local_catch_undefined.priority: 1  # execute last
       traefik.http.routers.local_catch_undefined.middlewares: local_catch_undefined
@@ -123,6 +125,7 @@ services:
     labels:
       traefik.enable: true
       # local_portainer
+      traefik.http.routers.local_portainer.service: local_portainer
       traefik.http.routers.local_portainer.rule: Host(`portainer.local.test`)
       traefik.http.services.local_portainer.loadbalancer.server.port: 9000
 
@@ -142,5 +145,6 @@ services:
     labels:
       traefik.enable: true
       # local_whoami
+      traefik.http.routers.local_whoami.service: local_whoami
       traefik.http.routers.local_whoami.rule: Host(`whoami.local.test`) && !Path(`/favicon.ico`)
       traefik.http.services.local_whoami.loadbalancer.server.port: 80

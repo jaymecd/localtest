@@ -70,12 +70,13 @@ networks:
   my_stack:
 
 services:
-  app1:
+  my_app1:  # externally routable container
     image: my_image:version
     labels:
       traefik.enable: true
+      traefik.http.routers.my_app1.service: my_app1
       traefik.http.routers.my_app1.rule: Host(`[HOSTNAME]`)
-      traefik.http.services.my_app1.loadbalancer.server.port: 8080  # container port
+      traefik.http.services.my_app1.loadbalancer.server.port: 8080  # container exposed port
     networks:
       local_test:
       my_stack:
