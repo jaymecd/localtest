@@ -1,7 +1,7 @@
-# Local development with docker
+# .local.test development
 
-**Objective:** Elevate Developer Experience (DX) for local development with `docker`
-by enabling `.test` FQDNs with TLS support and services auto-wire using labels.
+**Objective:** Elevate Developer Experience (DX) for local development using `docker`
+with `.test` TLD host names, encryption in-transit using TLS with local Root CA, and services auto-wire using labels.
 
 This solution, built on a streamlined `docker compose` stack, eliminates the need for random port bindings
 and allows developers to replicate application infrastructures of nearly any complexity locally,
