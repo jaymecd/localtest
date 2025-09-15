@@ -1,16 +1,16 @@
 networks:
-  proxy:
+  local_test:
     external: true
 
 volumes:
-  proxy_certs:
+  local_test_certs:
     external: true
 
 services:
   nodejs:
     image: node:20-alpine
     networks:
-      proxy:
+      local_test:
     working_dir: /app
     volumes:
       - ./src:/app:ro
@@ -31,10 +31,10 @@ services:
   nodejs_ca:
     image: node:20-alpine
     networks:
-      proxy:
+      local_test:
     working_dir: /app
     volumes:
-      - proxy_certs:/certs:ro
+      - local_test_certs:/certs:ro
       - ./src:/app:ro
       - /app/node_modules
     environment:

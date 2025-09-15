@@ -5,14 +5,14 @@ include:
   - ./java/compose.yaml
 
 networks:
-  proxy:
+  local_test:
     external: true
 
 services:
   homepage:
     image: caddy:2.8.4-alpine
     networks:
-      proxy:
+      local_test:
     volumes:
       - ./index.html:/usr/share/caddy/index.html:ro
     labels:

@@ -1,12 +1,12 @@
-name: proxy
+name: local_test
 
 networks:
-  proxy:
-    name: proxy  # globally unique for import
+  local_test:
+    name: local_test  # globally unique for import
 
 volumes:
-  proxy_certs:
-    name: proxy_certs  # globally unique for import
+  local_test_certs:
+    name: local_test_certs  # globally unique for import
 
 services:
 
@@ -16,9 +16,9 @@ services:
     security_opt:
       - no-new-privileges=true
     networks:
-      proxy:
+      local_test:
     volumes:
-      - proxy_certs:/certs:rw
+      - local_test_certs:/certs:rw
       - ./certs:/certs_ca:rw
     environment:
       TLS_PATH_CA: /certs_ca
@@ -33,7 +33,7 @@ services:
     security_opt:
       - no-new-privileges=true
     networks:
-      proxy:
+      local_test:
     ports:
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:53:53/udp
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:53:53/tcp
@@ -56,16 +56,17 @@ services:
     security_opt:
       - no-new-privileges=true
     networks:
-      proxy:
+      local_test:
     ports:
       # NOTE: need manually update on entrypoint updates or using compose.override.yaml
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:80:80/tcp
       - ${DOCKER_DEFAULT_IP:-172.17.0.1}:443:443/tcp
     volumes:
-      - proxy_certs:/certs:ro
+      - local_test_certs:/certs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      TRAEFIK_LOG_LEVEL: ${TRAEFIK_LOG_LEVEL:-}
+      TRAEFIK_LOG_LEVEL: ${TRAEFIK_LOG_LEVEL:-INFO}
+      TRAEFIK_DOCKER_NETWORK: local_test
     labels:
       traefik.enable: true
       # local_traefik
@@ -83,17 +84,15 @@ services:
     security_opt:
       - no-new-privileges=true
     networks:
-      proxy:
+      local_test:
     labels:
       traefik.enable: true
       # local_homepage
-      traefik.http.routers.local_homepage.service: local_homepage
       traefik.http.routers.local_homepage.rule: Host(`local.test`) || Path(`/favicon.ico`)
       traefik.http.routers.local_homepage.middlewares: local_homepage
       traefik.http.services.local_homepage.loadbalancer.server.port: 80
       traefik.http.middlewares.local_homepage.addprefix.prefix: /homepage
       # local_catch_undefined
-      traefik.http.routers.local_catch_undefined.service: local_catch_undefined
       traefik.http.routers.local_catch_undefined.rule: Host(`local.test`) || Path(`/`)
       traefik.http.routers.local_catch_undefined.priority: 1  # execute last
       traefik.http.routers.local_catch_undefined.middlewares: local_catch_undefined
@@ -114,7 +113,7 @@ services:
     security_opt:
       - no-new-privileges=true
     networks:
-      proxy:
+      local_test:
     command:
       - --host=unix:///var/run/docker.sock
     environment:
@@ -124,7 +123,6 @@ services:
     labels:
       traefik.enable: true
       # local_portainer
-      traefik.http.routers.local_portainer.service: local_portainer
       traefik.http.routers.local_portainer.rule: Host(`portainer.local.test`)
       traefik.http.services.local_portainer.loadbalancer.server.port: 9000
 
@@ -137,13 +135,12 @@ services:
     security_opt:
       - no-new-privileges=true
     networks:
-      proxy:
+      local_test:
     scale: 2
     command:
       - --verbose
     labels:
       traefik.enable: true
       # local_whoami
-      traefik.http.routers.local_whoami.service: local_whoami
       traefik.http.routers.local_whoami.rule: Host(`whoami.local.test`) && !Path(`/favicon.ico`)
       traefik.http.services.local_whoami.loadbalancer.server.port: 80

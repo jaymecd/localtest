@@ -61,11 +61,11 @@
         <br />if not - start stack
       </li>
       <li>verify that stack services have <span class="highlight">traefik</span> labels and <span
-          class="highlight">proxy</span> network attached,
+          class="highlight">local_test</span> network attached,
         <br />if not - adjust config and restart stack
         <pre><code class="replace language-yaml"># file: compose.yaml or docker-compose.yaml
 networks:
-  proxy:
+  local_test:
     external: true
   my_stack:
 
@@ -77,7 +77,7 @@ services:
       traefik.http.routers.my_app1.rule: Host(`[HOSTNAME]`)
       traefik.http.services.my_app1.loadbalancer.server.port: 8080  # container port
     networks:
-      proxy:
+      local_test:
       my_stack:
   ...
 </code></pre>

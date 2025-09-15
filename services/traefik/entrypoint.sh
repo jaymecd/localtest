@@ -21,7 +21,8 @@ set -e
 
 # update static config as it's not allowed to both at once
 sed -i \
-    -e "s/\${TRAEFIK_LOG_LEVEL}/${TRAEFIK_LOG_LEVEL:-INFO}/g" \
+    -e "s/\${TRAEFIK_LOG_LEVEL}/${TRAEFIK_LOG_LEVEL:?empty or missing environment variable}/g" \
+    -e "s/\${TRAEFIK_DOCKER_NETWORK}/${TRAEFIK_DOCKER_NETWORK:?empty or missing environment variable}/g" \
     /etc/traefik/traefik.yml
 
 if grep -qF '${TRAEFIK_' /etc/traefik/traefik.yml; then
@@ -30,8 +31,8 @@ if grep -qF '${TRAEFIK_' /etc/traefik/traefik.yml; then
 fi
 
 # trigger config reload on certificate modification using providers.file.directory=/etc/traefik config
-echo "Watching /certs/proxy.crt for changes to reload Traefik config ..."
+echo "Watching /certs/local-test.crt for changes to reload Traefik config ..."
 touch /etc/traefik/certs.log
-inotifywait /certs/proxy.crt -d -q -o /etc/traefik/certs.log -e modify --format '[%T] %|e %w%f' --timefmt '%F %T'
+inotifywait /certs/local-test.crt -d -q -o /etc/traefik/certs.log -e modify --format '[%T] %|e %w%f' --timefmt '%F %T'
 
 exec "$@"

@@ -11,7 +11,7 @@ generate_checksums() {
     {
         ls -1 /etc/ssl/certs/ca-certificates.crt requested_sans
         find "${TLS_PATH_CA}" -type f -name "rootCA*.pem"
-        find "${TLS_PATH_CERTS}" -type f -name "proxy*"
+        find "${TLS_PATH_CERTS}" -type f -name "local-test*"
         find "${TLS_PATH_CERTS}" -type f -name "ca-*"
     } \
         | sort -u \
@@ -70,15 +70,16 @@ if [[ -s "${TLS_PATH_CERTS}/checksums.sha256" ]]; then
     echo "Refreshing certificates ..."
 fi
 
-cp "${TLS_PATH_CA}/rootCA.pem" "${TLS_PATH_CERTS}/ca-proxy.crt"
+cp "${TLS_PATH_CA}/rootCA.pem" "${TLS_PATH_CERTS}/ca-local-test.crt"
 cp /etc/ssl/certs/ca-certificates.crt "${TLS_PATH_CERTS}/ca-bundle.crt"
 
 < requested_sans xargs -r \
-    -- mkcert -cert-file "${TLS_PATH_CERTS}/proxy.crt" -key-file "${TLS_PATH_CERTS}/proxy.key" 2>&1 \
+    -- mkcert -cert-file "${TLS_PATH_CERTS}/local-test.crt" -key-file "${TLS_PATH_CERTS}/local-test.key" 2>&1 \
     | sed -e '/^\s*$/d'
 
 generate_checksums | tee "${TLS_PATH_CERTS}/checksums.sha256" > /dev/null
 
-echo "Local CA certificate is at \"${TLS_PATH_CERTS}/ca-proxy.crt\" and CA bundle at \"${TLS_PATH_CERTS}/ca-bundle.crt\" ✅"
+echo "CA certificate for .test is in \"${TLS_PATH_CERTS}/ca-local-test.crt\" file. ✅"
+echo "CA bundle is in \"${TLS_PATH_CERTS}/ca-bundle.crt\" file. ✅"
 
 echo "DONE"
