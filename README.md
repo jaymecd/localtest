@@ -1,7 +1,7 @@
 # .local.test development
 
 **Objective:** Enhance developer experience (DX) with a streamlined `docker compose` stack that offers `.test` TLD support,
-local DNS, TLS encryption, load-balanced auto-wired routing, and offline capability - without the overhead of complex orchestration platforms.
+local DNS, TLS encryption, load-balancer with auto-wired routing, and offline capability without the overhead of complex orchestration platforms.
 
 **Status:** In active development
 
