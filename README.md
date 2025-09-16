@@ -1,49 +1,39 @@
 # .local.test development
 
-**Objective:** Elevate Developer Experience (DX) for local development using `docker`
-with `.test` TLD host names, encryption in-transit using TLS with local Root CA, and services auto-wire using labels.
-
-This solution, built on a streamlined `docker compose` stack, eliminates the need for random port bindings
-and allows developers to replicate application infrastructures of nearly any complexity locally,
-with containerized environments and a single entry point.
+**Objective:** Enhance developer experience (DX) with a streamlined `docker compose` stack that offers `.test` TLD support,
+local DNS, TLS encryption, load-balanced auto-wired routing, and offline capability - without the overhead of complex orchestration platforms.
 
 **Status:** In active development
 
 **Rationale:**
 
 > Back in November 2017, I ran into a common challenge: how to make my local development environment behave
-> like production with encryption-in-transit and proper host names.
-> At the time, I was juggling multiple random ports bound to localhost, eventually causing collision on desired ports.
+> like production with encryption-in-transit and FQDN supports.
+> At the time, I was working on two projects, and managing multiple localhost ports was a pain—eventually
+> causing collisions on the desired ports. Still, it was functional.
 >
-> My first attempt was rough — MacOS-only. It wasn’t elegant, but it served its purpose, as I was working only on 2 projects.
-> Later, my attention shifted to cloud infrastructure, and this issue faded away.
+> Later, my focus moved to cloud infrastructure, and this issue faded into the background — until recently.
 >
-> By Christmas 2024, I found myself returning to local web development. The old approach no longer felt sufficient.
+> By Christmas 2024, I had returned to local web development, only to find that the old approach was no longer sufficient.
 >
-> I narrowed it down to a simple set of requirements. The solution should:
-> - be effortless for any developer to run.
-> - work fully offline, as a self-contained setup.
-> - provide consistency across different platforms.
-> - stay flexible, without hidden quirks or half-measures.
->
-> After time of researching and testing, I've eventually put together a combination of open-source tools that felt stable and practical.
->
-> It’s not perfect, but it’s a cleaner, more reliable way to bring local development closer to production.
+> I'm not big fan of kubernetes, and after a period of research and testing, I eventually developed an approach to meet
+> my needs using a set of open-source tools that felt both stable and practical.
 >
 > -- <cite>Nikolai Zujev</cite>
 
 **List of features:**
 - OS-agnostic (Linux/macOS) developer experience
-- seamless routing on **host** and in **containers** using same FQDNs
 - reserved [.test](https://en.wikipedia.org/wiki/.test) TLD support
-- private **DNS nameserver** by `dnsmasq`
-- automated TLS certificate generation with `mkcert`
+- seamless routing on **host** and in **containers** using `.test` FQDNs
+- private **DNS nameserver** by `dnsmasq` to minimize network hops
+- full **offline** support, except for the initial build and run
 - layer 4 and 7 **load-balancer** with **TLS termination** by `traefik`
+- automated TLS certificate generation with `mkcert`
 - flexible UI to manage `docker` resources by `portainer`
-- configuration customization support
-- framework to auto-wire separate application stacks using docker labels
-- full **offline** support, except for the initial build & run
+- auto-wire of separate application stacks using `traefik` labels
 - various examples and more ...
+
+> This project was partially inspired by [devspace](https://devspace.sh) (K8s-based) and `localtest.me` (needs connection to resolve 127.0.0.1).
 
 ```mermaid
 graph LR
@@ -89,7 +79,7 @@ graph LR
 ```
 
 Such setup enhances security by limiting internal resources exposure while enabling seamless FQDN resolution from the
-host and from the container, ensuring efficient and secure communication.
+host and from the container, ensuring efficient and secure communication, that can work with disconnected network.
 
 **Tested on:**
 
