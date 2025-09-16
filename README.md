@@ -502,7 +502,7 @@ After host system is configured, `.test` FQDNs must be resolved and accessible f
     from container:
 
     ```console
-    $ docker run --rm --network local_test busybox nslookup local.test
+    $ docker run --rm --network localtest busybox nslookup local.test
     ```
 
     > **NOTE:** using `colima` VM - container test might fail for the first time - please retry.
@@ -516,8 +516,8 @@ After host system is configured, `.test` FQDNs must be resolved and accessible f
 
     from container:
     ```console
-    $ docker run --rm --network local_test \
-      -v local_test_certs:/certs:ro -e CURL_CA_BUNDLE=/certs/ca-bundle.crt alpine \
+    $ docker run --rm --network localtest \
+      -v localtest_certs:/certs:ro -e CURL_CA_BUNDLE=/certs/ca-bundle.crt alpine \
       sh -ec 'apk add -q curl; curl -LisS http://whoami.local.test'
     ```
 

@@ -22,8 +22,8 @@ ca_certificate = /certs/ca-bundle.pem
 `java` uses it's own trust store, so certificate has to be explicitly imported using alias:
 
 ```shell
-$ keytool -cacerts -storepass changeit -list -alias proxy_root_ca >/dev/null 2>&1 \
-    || keytool -cacerts -storepass changeit -importcert -noprompt -file /certs/local_test-ca.crt -alias proxy_root_ca
+$ keytool -cacerts -storepass changeit -list -alias ca-localtest >/dev/null 2>&1 \
+    || keytool -cacerts -storepass changeit -importcert -noprompt -file /certs/ca-localtest.crt -alias ca-localtest
 ```
 
 ### NodeJS

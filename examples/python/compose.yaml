@@ -1,16 +1,16 @@
 networks:
-  local_test:
+  localtest:
     external: true
 
 volumes:
-  local_test_certs:
+  localtest_certs:
     external: true
 
 services:
   python:
     image: python:3.12-alpine
     networks:
-      local_test:
+      localtest:
     working_dir: /app
     volumes:
       - ./src:/app:ro
@@ -30,10 +30,10 @@ services:
   python_ca:
     image: python:3.12-alpine
     networks:
-      local_test:
+      localtest:
     working_dir: /app
     volumes:
-      - local_test_certs:/certs:ro
+      - localtest_certs:/certs:ro
       - ./src:/app:ro
     environment:
       CURL_CA_BUNDLE: /certs/ca-bundle.crt

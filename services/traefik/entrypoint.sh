@@ -31,8 +31,8 @@ if grep -qF '${TRAEFIK_' /etc/traefik/traefik.yml; then
 fi
 
 # trigger config reload on certificate modification using providers.file.directory=/etc/traefik config
-echo "Watching /certs/local-test.crt for changes to reload Traefik config ..."
+echo "Watching /certs/localtest.crt for changes to reload Traefik config ..."
 touch /etc/traefik/certs.log
-inotifywait /certs/local-test.crt -d -q -o /etc/traefik/certs.log -e modify --format '[%T] %|e %w%f' --timefmt '%F %T'
+inotifywait /certs/localtest.crt -d -q -o /etc/traefik/certs.log -e modify --format '[%T] %|e %w%f' --timefmt '%F %T'
 
 exec "$@"

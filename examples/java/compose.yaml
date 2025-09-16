@@ -1,16 +1,16 @@
 networks:
-  local_test:
+  localtest:
     external: true
 
 volumes:
-  local_test_certs:
+  localtest_certs:
     external: true
 
 services:
   java:
     image: openjdk:21-jdk-slim
     networks:
-      local_test:
+      localtest:
     working_dir: /app
     volumes:
       - ./src:/app:ro
@@ -30,10 +30,10 @@ services:
   java_ca:
     image: openjdk:21-jdk-slim
     networks:
-      local_test:
+      localtest:
     working_dir: /app
     volumes:
-      - local_test_certs:/certs:ro
+      - localtest_certs:/certs:ro
       - ./src:/app:ro
     command:
       - /bin/sh
@@ -43,10 +43,10 @@ services:
 
         # convert custom CA root to p12
         keytool -importcert \
-          -file /certs/ca-local-test.crt \
+          -file /certs/ca-localtest.crt \
           -keystore /tmp/truststore.p12 \
           -storepass truststore \
-          -alias my-ca \
+          -alias ca-localtest \
           -noprompt
 
         keytool -list \
