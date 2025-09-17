@@ -18,5 +18,6 @@ services:
     labels:
       traefik.enable: true
       traefik.http.routers.examples_homepage.rule: Host(`examples.test`)
-      traefik.http.routers.examples_homepage.tls: true
+      traefik.http.routers.examples_homepage.entrypoints: https
+      traefik.http.routers.examples_homepage.service: examples_homepage
       traefik.http.services.examples_homepage.loadbalancer.server.port: 80

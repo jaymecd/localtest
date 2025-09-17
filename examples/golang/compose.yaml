@@ -23,6 +23,8 @@ services:
     labels:
       traefik.enable: true
       traefik.http.routers.examples_golang.rule: Host(`golang.examples.test`)
+      traefik.http.routers.examples_golang.entrypoints: https
+      traefik.http.routers.examples_golang.service: examples_golang
       traefik.http.services.examples_golang.loadbalancer.server.port: 8080
 
   golang_ca:
@@ -45,4 +47,6 @@ services:
     labels:
       traefik.enable: true
       traefik.http.routers.examples_golang_ca.rule: Host(`golang-ca.examples.test`)
+      traefik.http.routers.examples_golang_ca.entrypoints: https
+      traefik.http.routers.examples_golang_ca.service: examples_golang_ca
       traefik.http.services.examples_golang_ca.loadbalancer.server.port: 8080

@@ -26,6 +26,8 @@ services:
     labels:
       traefik.enable: true
       traefik.http.routers.examples_nodejs.rule: Host(`nodejs.examples.test`)
+      traefik.http.routers.examples_nodejs.entrypoints: https
+      traefik.http.routers.examples_nodejs.service: examples_nodejs
       traefik.http.services.examples_nodejs.loadbalancer.server.port: 8080
 
   nodejs_ca:
@@ -50,4 +52,6 @@ services:
     labels:
       traefik.enable: true
       traefik.http.routers.examples_nodejs_ca.rule: Host(`nodejs-ca.examples.test`)
+      traefik.http.routers.examples_nodejs_ca.entrypoints: https
+      traefik.http.routers.examples_nodejs_ca.service: examples_nodejs_ca
       traefik.http.services.examples_nodejs_ca.loadbalancer.server.port: 8080

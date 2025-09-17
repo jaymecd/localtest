@@ -64,22 +64,25 @@
           class="highlight">localtest</span> network attached,
         <br />if not - adjust config and restart stack
         <pre><code class="replace language-yaml"># file: compose.yaml or docker-compose.yaml
+name: my_app
+
 networks:
-  localtest:
+  localtest:  # << shared network
     external: true
-  my_stack:
+  my_app:
 
 services:
-  my_app1:  # externally routable container
+  api:  # << externally routable container
     image: my_image:version
     labels:
       traefik.enable: true
-      traefik.http.routers.my_app1.service: my_app1
-      traefik.http.routers.my_app1.rule: Host(`[HOSTNAME]`)
-      traefik.http.services.my_app1.loadbalancer.server.port: 8080  # container exposed port
+      traefik.http.routers.my_app_api.rule: Host(`[HOSTNAME]`)
+      traefik.http.routers.my_app_api.entrypoints: https
+      traefik.http.routers.my_app_api.service: my_app_api
+      traefik.http.services.my_app_api.loadbalancer.server.port: 8080  # << container exposed port
     networks:
-      localtest:
-      my_stack:
+      localtest:  # << allow routing auto-wire
+      my_app:
   ...
 </code></pre>
       </li>

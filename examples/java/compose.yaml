@@ -25,6 +25,8 @@ services:
     labels:
       traefik.enable: true
       traefik.http.routers.examples_java.rule: Host(`java.examples.test`)
+      traefik.http.routers.examples_java.entrypoints: https
+      traefik.http.routers.examples_java.service: examples_java
       traefik.http.services.examples_java.loadbalancer.server.port: 8080
 
   java_ca:
@@ -65,4 +67,6 @@ services:
     labels:
       traefik.enable: true
       traefik.http.routers.examples_java_ca.rule: Host(`java-ca.examples.test`)
+      traefik.http.routers.examples_java_ca.entrypoints: https
+      traefik.http.routers.examples_java_ca.service: examples_java_ca
       traefik.http.services.examples_java_ca.loadbalancer.server.port: 8080
