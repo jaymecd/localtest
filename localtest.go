@@ -199,7 +199,14 @@ func initStack() error {
 
 	versionFile := filepath.Join(dest, ".version")
 
-	if !fileExists(versionFile) {
+	doExtract := true
+
+	if fileExists(versionFile) {
+		// TODO: compare version
+		doExtract = false
+	}
+
+	if doExtract {
 		if err := extractStackFiles(dest); err != nil {
 			return err
 		}
