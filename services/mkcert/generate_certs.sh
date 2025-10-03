@@ -41,7 +41,7 @@ export CAROOT="${TLS_PATH_CA}" TRUST_STORES="system"
 
 if [[ ! -s "${TLS_PATH_CA}/rootCA.pem" || ! -s "${TLS_PATH_CA}/rootCA-key.pem" ]]; then
     # both files are required
-    ( cd "${TLS_PATH_CA}" && rm -f rootCA*.pem )
+    ( cd "${TLS_PATH_CA}" && rm -f rootCA*.pem && sync )
 fi
 
 # strip empty lines from output
@@ -59,6 +59,12 @@ awk -v decoder='openssl x509 -noout -subject 2>/dev/null' '/BEGIN/{close(decoder
     | grep -qFx "${SUBJECT}" \
     || fatal "local CA certificate is not bundled"
 
+if [[ ! -s "${TLS_PATH_CERTS}/localtest.pem" ]]; then
+	# reset checksum
+	rm -f "${TLS_PATH_CERTS}/checksums.sha256"
+	sync
+fi
+
 if [[ -s "${TLS_PATH_CERTS}/checksums.sha256" ]]; then
     echo "Verifying existing checksums ..."
 
@@ -70,16 +76,16 @@ if [[ -s "${TLS_PATH_CERTS}/checksums.sha256" ]]; then
     echo "Refreshing certificates ..."
 fi
 
-cp "${TLS_PATH_CA}/rootCA.pem" "${TLS_PATH_CERTS}/ca-localtest.crt"
-cp /etc/ssl/certs/ca-certificates.crt "${TLS_PATH_CERTS}/ca-bundle.crt"
+cp "${TLS_PATH_CA}/rootCA.pem" "${TLS_PATH_CERTS}/ca-localtest.pem"
+cp /etc/ssl/certs/ca-certificates.crt "${TLS_PATH_CERTS}/ca-bundle.pem"
 
 < requested_sans xargs -r \
-    -- mkcert -cert-file "${TLS_PATH_CERTS}/localtest.crt" -key-file "${TLS_PATH_CERTS}/localtest.key" 2>&1 \
+    -- mkcert -cert-file "${TLS_PATH_CERTS}/localtest.pem" -key-file "${TLS_PATH_CERTS}/localtest-key.pem" 2>&1 \
     | sed -e '/^\s*$/d'
 
 generate_checksums | tee "${TLS_PATH_CERTS}/checksums.sha256" > /dev/null
 
-echo "CA certificate for .test is in \"${TLS_PATH_CERTS}/ca-localtest.crt\" file. ✅"
-echo "CA bundle is in \"${TLS_PATH_CERTS}/ca-bundle.crt\" file. ✅"
+echo "CA certificate for .test is in \"${TLS_PATH_CERTS}/ca-localtest.pem\" file. ✅"
+echo "CA bundle is in \"${TLS_PATH_CERTS}/ca-bundle.pem\" file. ✅"
 
 echo "DONE"

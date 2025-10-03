@@ -40,7 +40,7 @@ services:
       - ./src:/app:ro
       - /app/node_modules
     environment:
-      NODE_EXTRA_CA_CERTS: /certs/ca-bundle.crt
+      NODE_EXTRA_CA_CERTS: /certs/ca-bundle.pem
     command:
       - /bin/sh
       - -ec

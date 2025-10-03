@@ -36,8 +36,8 @@ services:
       - localtest_certs:/certs:ro
       - ./src:/app:ro
     environment:
-      # CURL_CA_BUNDLE: /certs/ca-bundle.crt
-      SSL_CERT_FILE: /certs/ca-bundle.crt
+      # CURL_CA_BUNDLE: /certs/ca-bundle.pem
+      SSL_CERT_FILE: /certs/ca-bundle.pem
     command:
       - /bin/sh
       - -ec

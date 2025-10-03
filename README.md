@@ -507,7 +507,7 @@ After host system is configured, `.test` FQDNs must be resolved and accessible f
     from container:
     ```console
     $ docker run --rm --network localtest \
-      -v localtest_certs:/certs:ro -e CURL_CA_BUNDLE=/certs/ca-bundle.crt alpine \
+      -v localtest_certs:/certs:ro -e CURL_CA_BUNDLE=/certs/ca-bundle.pem alpine \
       sh -ec 'apk add -q curl; curl -LisS http://whoami.local.test'
     ```
 
