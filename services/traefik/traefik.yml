@@ -39,14 +39,14 @@ providers:
 tcpServersTransport:
   tls:
     rootCAs:
-      - /certs/ca-localtest.crt
+      - /certs/ca-localtest.pem
 
 tls:
   stores:
     default:
       defaultCertificate:
-        certFile: /certs/localtest.crt
-        keyFile: /certs/localtest.key
+        certFile: /certs/localtest.pem
+        keyFile: /certs/localtest-key.pem
   options:
     default:
       minVersion: VersionTLS12
