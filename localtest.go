@@ -382,8 +382,6 @@ func init() {
 	rootCmd.AddCommand(upCmd, downCmd, logsCmd, psCmd, rmCmd, verifyCmd)
 	rootCmd.Flags().BoolVar(&showDir, "dir", false, "Print stack directory and exit")
 
-	// disable the '-v' alias for the version flag
-	rootCmd.Flags().Bool("version", false, "Print version information and exit")
 	rootCmd.SetVersionTemplate(`{{printf "%s\n" .Version}}`)
 }
 
