@@ -207,7 +207,7 @@ func initStack() error {
 	}
 
 	if doExtract {
-		if err := extractStackFiles(dest); err != nil {
+		if err := extractStackFiles(dest, true); err != nil {
 			return err
 		}
 
@@ -251,9 +251,36 @@ func verifyAllSHA256(dest string) error {
 	return nil
 }
 
-func extractStackFiles(dest string) error {
-	if err := os.RemoveAll(dest); err != nil {
-		return fmt.Errorf("failed to remove stack dir: %w", err)
+func isDirEmpty(name string) (bool, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	defer f.Close()
+
+	if _, err = f.Readdirnames(1); err == io.EOF {
+		return true, nil
+	}
+	return false, err
+}
+
+func extractStackFiles(dest string, cleanup bool) error {
+	if cleanup {
+		if err := os.RemoveAll(dest); err != nil {
+			return fmt.Errorf("failed to remove stack dir: %w", err)
+		}
+	} else {
+		isEmpty, err := isDirEmpty(dest)
+		if err != nil {
+			return err
+		}
+
+		if !isEmpty {
+			return fmt.Errorf("Directory is not empty.")
+		}
 	}
 
 	fmt.Printf("Extracting %d files to %s directory:\n", len(fileList), dest)
