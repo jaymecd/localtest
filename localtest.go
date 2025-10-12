@@ -392,6 +392,8 @@ func syncStack(update bool) (bool, error) {
 
 	sv := NewStackVersionV1()
 
+	rebuild := fileExists(rebuildFile)
+
 	if err := sv.LoadFromFile(infoFile); err != nil {
 		if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, ErrMagicHeaderInvalid) {
 			return false, fmt.Errorf("stack exists, failed to read info (%w)\n", err)
@@ -399,8 +401,6 @@ func syncStack(update bool) (bool, error) {
 
 		update = true
 	}
-
-	rebuild := fileExists(rebuildFile)
 
 	if update {
 		if err := extractStackFiles(dest, true); err != nil {
@@ -427,8 +427,8 @@ func syncStack(update bool) (bool, error) {
 	return rebuild, nil
 }
 
-func verifyAllSHA256(dest string) error {
-	fmt.Printf("Verifying integrity of %s stack ...\n", appName)
+func verifyAllSHA256(dest string, verbose bool) error {
+	fmt.Printf("Verifying stack integrity in %q directory ...\n", dest)
 
 	failures := 0
 
@@ -443,6 +443,8 @@ func verifyAllSHA256(dest string) error {
 		if !valid {
 			fmt.Printf("%s: FAILED\n", file.Path)
 			failures++
+		} else if verbose {
+			fmt.Printf("%s: OK\n", file.Path)
 		}
 	}
 
@@ -542,7 +544,7 @@ func extractStackFiles(dest string, cleanup bool) error {
 		}
 	}
 
-	if err := verifyAllSHA256(dest); err != nil {
+	if err := verifyAllSHA256(dest, false); err != nil {
 		return err
 	}
 
@@ -658,6 +660,20 @@ var cmdRm = &cobra.Command{
 			args = append(args, "--volumes", "--rmi", "all")
 		}
 
+		dest := stackDir()
+
+		if !fileExists(filepath.Join(dest, stackInfoFile)) {
+			return fmt.Errorf("%w in %s", ErrStackNotExist, dest)
+		}
+
+		if !HasInternetConnection() {
+			return fmt.Errorf("running in offline mode, removal is postponed ;)")
+		}
+
+		if !Confirm("Are you sure to remove?", false) {
+			return fmt.Errorf("decided to postpone removal")
+		}
+
 		if err := runDockerCompose(args...); err != nil {
 			if !errors.Is(err, ErrStackNotExist) {
 				return err
@@ -682,7 +698,7 @@ var cmdVerify = &cobra.Command{
 	Use:   "verify",
 	Short: "Verify integrity",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return verifyAllSHA256(stackDir())
+		return verifyAllSHA256(stackDir(), true)
 	},
 }
 
