@@ -33,6 +33,7 @@ var (
 )
 
 var ErrStackNotExist = errors.New("docker compose stack does not exist")
+var ErrMagicHeaderInvalid = errors.New("magic header invalid")
 
 func stackDir() string {
 	home, err := os.UserHomeDir()
@@ -103,7 +104,17 @@ func (sv StackVersion) SaveToFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("marshal error: %w", err)
 	}
-	return os.WriteFile(path, data, 0o644)
+
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+		return fmt.Errorf("write temp file error: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("rename temp file error: %w", err)
+	}
+
+	return nil
 }
 
 func (sv *StackVersion) LoadFromFile(path string) error {
@@ -114,8 +125,15 @@ func (sv *StackVersion) LoadFromFile(path string) error {
 	return sv.UnmarshalBinary(data)
 }
 
+// Magic header for content negotiation/versioning
+var stackVersionMagicHeader = []byte("SVMH")
+
 func (s StackVersion) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
+
+	if _, err := buf.Write(stackVersionMagicHeader); err != nil {
+		return nil, err
+	}
 
 	if err := binary.Write(buf, binary.BigEndian, s.SpecVersion); err != nil {
 		return nil, err
@@ -159,11 +177,18 @@ func (s StackVersion) MarshalBinary() ([]byte, error) {
 }
 
 func (s *StackVersion) UnmarshalBinary(data []byte) error {
-	if len(data) < 1 {
-		return fmt.Errorf("data too short")
+	if len(data) < len(stackVersionMagicHeader)+1 {
+		return fmt.Errorf("data too short (%w)", ErrMagicHeaderInvalid)
 	}
 
-	r := bytes.NewReader(data)
+	header := data[:len(stackVersionMagicHeader)]
+	payload := data[len(stackVersionMagicHeader):]
+
+	if !bytes.Equal(header, stackVersionMagicHeader) {
+		return ErrMagicHeaderInvalid
+	}
+
+	r := bytes.NewReader(payload)
 
 	readString := func() (string, error) {
 		var length int32
@@ -337,7 +362,7 @@ func syncStack(update bool) error {
 	sv := NewStackVersionV1()
 
 	if err := sv.LoadFromFile(infoFile); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, ErrMagicHeaderInvalid) {
 			return fmt.Errorf("stack exists, failed to read info (%w)\n", err)
 		}
 
@@ -658,6 +683,12 @@ var cmdUp = &cobra.Command{
 
 		if err := runDockerCompose(args...); err != nil {
 			return err
+		}
+
+		if string(rebuild) == "1" {
+			if err := os.RemoveAll(rebuildFile); err != nil {
+				return err
+			}
 		}
 
 		fmt.Printf("\nNow it's time to open %s and enjoy local development. ;)\n", appUrl)
