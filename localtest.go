@@ -354,7 +354,7 @@ func deepCompare(file1, file2 string) (bool, error) {
 	}
 }
 
-func syncStack(update bool) error {
+func syncStack(update bool) (bool, error) {
 	dest := stackDir()
 	infoFile := filepath.Join(dest, stackInfoFile)
 	rebuildFile := filepath.Join(dest, stackRebuildFile)
@@ -363,35 +363,37 @@ func syncStack(update bool) error {
 
 	if err := sv.LoadFromFile(infoFile); err != nil {
 		if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, ErrMagicHeaderInvalid) {
-			return fmt.Errorf("stack exists, failed to read info (%w)\n", err)
+			return false, fmt.Errorf("stack exists, failed to read info (%w)\n", err)
 		}
 
 		update = true
 	}
 
-	forceRebuild := !sv.IsSameBinaryVersion()
+	rebuild := fileExists(rebuildFile)
 
 	if update {
 		if err := extractStackFiles(dest, true); err != nil {
-			return err
+			return false, err
 		}
 
 		if err := injectLocalRootCA(dest); err != nil {
-			return err
+			return false, err
 		}
+
+		rebuild = rebuild || !sv.IsSameBinaryVersion()
 
 		sv.RecordUpdate()
 
 		if err := sv.SaveToFile(infoFile); err != nil {
-			return fmt.Errorf("failed saving, err: %w\n", err)
+			return false, fmt.Errorf("failed saving, err: %w\n", err)
 		}
 
-		if forceRebuild {
+		if rebuild {
 			os.WriteFile(rebuildFile, []byte("1"), 0600)
 		}
 	}
 
-	return nil
+	return rebuild, nil
 }
 
 func verifyAllSHA256(dest string) error {
@@ -602,11 +604,17 @@ var cmdSync = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := syncStack(true); err != nil {
+		rebuild, err := syncStack(true)
+
+		if err != nil {
 			return err
 		}
 
 		fmt.Printf("Synchronization DONE\n")
+
+		if rebuild {
+			fmt.Printf("\nINFO: stack rebuild is pending, please run 'up' command.\n")
+		}
 
 		return nil
 	},
@@ -663,7 +671,8 @@ var cmdUp = &cobra.Command{
 	Short:              "Spin up the stack via 'docker compose up'",
 	DisableFlagParsing: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := syncStack(false); err != nil {
+		rebuild, err := syncStack(false)
+		if err != nil {
 			return err
 		}
 
@@ -672,12 +681,7 @@ var cmdUp = &cobra.Command{
 
 		args = append([]string{"up", "--wait", "--remove-orphans"}, args...)
 
-		rebuild, err := os.ReadFile(rebuildFile)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-
-		if string(rebuild) == "1" {
+		if rebuild {
 			args = append(args, "--always-recreate-deps", "--force-recreate")
 		}
 
@@ -685,7 +689,7 @@ var cmdUp = &cobra.Command{
 			return err
 		}
 
-		if string(rebuild) == "1" {
+		if rebuild {
 			if err := os.RemoveAll(rebuildFile); err != nil {
 				return err
 			}
