@@ -26,7 +26,7 @@ var ignorePatterns = normalizeIgnorePatterns([]string{
 	"*.bak",
 })
 
-type fileMeta struct {
+type StackFileMeta struct {
 	Path   string
 	Size   int64
 	Perm   fs.FileMode
@@ -59,7 +59,7 @@ func computeSHA256(path string) (string, error) {
 }
 
 func main() {
-	var filesMeta []fileMeta
+	var filesMeta []StackFileMeta
 
 	for _, pat := range searchPatterns {
 		matches, err := doublestar.Glob(os.DirFS("."), pat)
@@ -92,7 +92,7 @@ func main() {
 				panic(err)
 			}
 
-			filesMeta = append(filesMeta, fileMeta{
+			filesMeta = append(filesMeta, StackFileMeta{
 				Path:   filepath.ToSlash(rel),
 				Size:   info.Size(),
 				Perm:   info.Mode().Perm(),
@@ -117,19 +117,19 @@ func main() {
 	fmt.Fprintln(f, "import \"embed\"")
 	fmt.Fprintln(f, "import \"os\"")
 	fmt.Fprintln(f, "")
-	fmt.Fprintln(f, "type fileMeta struct {")
+	for _, file := range filesMeta {
+		fmt.Fprintln(f, "//go:embed ", file.Path)
+	}
+	fmt.Fprintln(f, "var stackFilesFS embed.FS")
+	fmt.Fprintln(f, "")
+	fmt.Fprintln(f, "type StackFileMeta struct {")
 	fmt.Fprintln(f, "\tPath string")
 	fmt.Fprintln(f, "\tSize int64")
 	fmt.Fprintln(f, "\tPerm os.FileMode")
 	fmt.Fprintln(f, "\tSha256 string")
 	fmt.Fprintln(f, "}")
 	fmt.Fprintln(f, "")
-	for _, file := range filesMeta {
-		fmt.Fprintln(f, "//go:embed ", file.Path)
-	}
-	fmt.Fprintln(f, "var stackFilesFS embed.FS")
-	fmt.Fprintln(f, "")
-	fmt.Fprintln(f, "var stackFilesMeta = []fileMeta{")
+	fmt.Fprintln(f, "var stackFilesMeta = []StackFileMeta{")
 	fmt.Printf("Discovered files: %d\n", len(filesMeta))
 	for _, file := range filesMeta {
 		fmt.Fprintf(f,

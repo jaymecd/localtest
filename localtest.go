@@ -8,12 +8,14 @@ import (
 	"crypto/subtle"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -21,11 +23,15 @@ import (
 const appName = "localtest"
 const appUrl = "https://local.test/"
 
+const stackInfoFile = ".localtest"
+
 var (
 	buildVersion = "unknown"
 	buildCommit  = "unknown"
 	buildDate    = "unknown"
 )
+
+var ErrStackNotExist = errors.New("docker compose stack does not exist")
 
 func stackDir() string {
 	home, err := os.UserHomeDir()
@@ -47,31 +53,159 @@ func fileExists(path string) bool {
 	return !info.IsDir()
 }
 
-type VersionInfo struct {
-	Version [60]byte
-	Commit  [40]byte
-	Date    [20]byte
+type BinaryVersion struct {
+	Version string
+	Commit  string
+	Date    string
 }
 
-func writeVersionFile(filePath string) error {
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+type StackVersion struct {
+	SpecVersion uint8
+	Binary      BinaryVersion
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func NewStackVersionV1() *StackVersion {
+	now := time.Now().Local()
+
+	sv := &StackVersion{
+		SpecVersion: 1,
+		Binary: BinaryVersion{
+			Version: buildVersion,
+			Commit:  buildCommit,
+			Date:    buildDate,
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	return sv
+}
+
+func (sv *StackVersion) RecordUpdate() {
+	sv.UpdatedAt = time.Now().Local()
+
+	if sv.Binary.Version != buildVersion {
+		sv.Binary.Version = buildVersion
+		sv.Binary.Commit = buildCommit
+		sv.Binary.Date = buildDate
+	}
+}
+
+func (sv StackVersion) IsSameBinaryVersion() bool {
+	return sv.Binary.Version == buildVersion
+}
+
+func (sv StackVersion) SaveToFile(path string) error {
+	data, err := sv.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("marshal error: %w", err)
+	}
+	return os.WriteFile(path, data, 0o644)
+}
+
+func (sv *StackVersion) LoadFromFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read error: %w", err)
+	}
+	return sv.UnmarshalBinary(data)
+}
+
+func (s StackVersion) MarshalBinary() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	if err := binary.Write(buf, binary.BigEndian, s.SpecVersion); err != nil {
+		return nil, err
+	}
+
+	writeString := func(str string) error {
+		b := []byte(str)
+		length := int32(len(b))
+		if err := binary.Write(buf, binary.BigEndian, length); err != nil {
+			return err
+		}
+		if err := binary.Write(buf, binary.BigEndian, b); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	writeTime := func(t time.Time) error {
+		ts := t.Unix()
+		return binary.Write(buf, binary.BigEndian, ts)
+	}
+
+	if err := writeString(s.Binary.Version); err != nil {
+		return nil, err
+	}
+	if err := writeString(s.Binary.Commit); err != nil {
+		return nil, err
+	}
+	if err := writeString(s.Binary.Date); err != nil {
+		return nil, err
+	}
+
+	if err := writeTime(s.CreatedAt); err != nil {
+		return nil, err
+	}
+	if err := writeTime(s.UpdatedAt); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (s *StackVersion) UnmarshalBinary(data []byte) error {
+	if len(data) < 1 {
+		return fmt.Errorf("data too short")
+	}
+
+	r := bytes.NewReader(data)
+
+	readString := func() (string, error) {
+		var length int32
+		if err := binary.Read(r, binary.BigEndian, &length); err != nil {
+			return "", err
+		}
+		if length < 0 {
+			return "", fmt.Errorf("invalid string length: %d", length)
+		}
+		b := make([]byte, length)
+		if _, err := io.ReadFull(r, b); err != nil {
+			return "", err
+		}
+		return string(b), nil
+	}
+
+	readTime := func() (time.Time, error) {
+		var ts int64
+		if err := binary.Read(r, binary.BigEndian, &ts); err != nil {
+			return time.Time{}, err
+		}
+		return time.Unix(ts, 0).Local(), nil
+	}
+
+	spec, err := r.ReadByte()
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if cerr := file.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("failed to close file: %w", cerr)
-		}
-	}()
+	s.SpecVersion = spec
 
-	info := VersionInfo{}
-
-	// Copy with truncation/padding
-	copy(info.Version[:], []byte(buildVersion))
-	copy(info.Commit[:], []byte(buildCommit))
-	copy(info.Date[:], []byte(buildDate))
-
-	if err := binary.Write(file, binary.LittleEndian, info); err != nil {
+	if s.Binary.Version, err = readString(); err != nil {
+		return err
+	}
+	if s.Binary.Commit, err = readString(); err != nil {
+		return err
+	}
+	if s.Binary.Date, err = readString(); err != nil {
+		return err
+	}
+	if s.CreatedAt, err = readTime(); err != nil {
+		return err
+	}
+	if s.UpdatedAt, err = readTime(); err != nil {
 		return err
 	}
 
@@ -196,28 +330,32 @@ func deepCompare(file1, file2 string) (bool, error) {
 
 func syncStack(update bool) error {
 	dest := stackDir()
+	infoFile := filepath.Join(dest, stackInfoFile)
 
-	versionFile := filepath.Join(dest, ".version")
+	sv := NewStackVersionV1()
 
-	doExtract := true
+	if err := sv.LoadFromFile(infoFile); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("stack exists, failed to read info (%w)\n", err)
+		}
 
-	if fileExists(versionFile) {
-		// TODO: compare version
-		doExtract = false
+		update = true
 	}
 
-	if doExtract {
+	if update {
 		if err := extractStackFiles(dest, true); err != nil {
 			return err
 		}
 
-		if err := writeVersionFile(versionFile); err != nil {
+		if err := injectLocalRootCA(dest); err != nil {
 			return err
 		}
-	}
 
-	if err := injectLocalRootCA(dest); err != nil {
-		return err
+		sv.RecordUpdate()
+
+		if err := sv.SaveToFile(infoFile); err != nil {
+			return fmt.Errorf("failed saving, err: %w\n", err)
+		}
 	}
 
 	return nil
@@ -250,7 +388,28 @@ func verifyAllSHA256(dest string) error {
 }
 
 func showInfo(dest string) error {
-	fmt.Printf("Stack directory:	%s\n", dest)
+	fmt.Printf("Stack directory:   %s\n", dest)
+
+	infoFile := filepath.Join(dest, stackInfoFile)
+
+	var sv StackVersion
+
+	if err := sv.LoadFromFile(infoFile); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("no stack found, run 'sync' first.\n")
+		}
+		return fmt.Errorf("stack exists, failed to read info (%w)\n", err)
+	}
+
+	fmt.Printf("Stack created at:  %s (%s ago)\n", sv.CreatedAt.Format(time.RFC3339), time.Since(sv.CreatedAt).Round(time.Second))
+	fmt.Printf("Stack updated at:  %s (%s ago)\n", sv.UpdatedAt.Format(time.RFC3339), time.Since(sv.UpdatedAt).Round(time.Second))
+	fmt.Printf("Stack version:     %s (Built on %s from %s commit)\n", sv.Binary.Version, sv.Binary.Commit, sv.Binary.Date)
+	fmt.Printf("Binary version:    %s (Built on %s from %s commit)\n", buildVersion, buildCommit, buildDate)
+
+	if !sv.IsSameBinaryVersion() {
+		fmt.Printf("\nINFO: stack and binary versions do not match, please consider 'sync' stack.\n")
+	}
+
 	return nil
 }
 
@@ -421,10 +580,14 @@ var cmdRm = &cobra.Command{
 		}
 
 		if err := runDockerCompose(args...); err != nil {
-			fmt.Printf("Stack clean up: %v\n", err)
-		} else {
-			fmt.Println("Stack cleaned up")
+			if !errors.Is(err, ErrStackNotExist) {
+				return err
+			}
+
+			fmt.Printf("Error: %v\n", err)
 		}
+
+		fmt.Println("Stack cleaned up")
 
 		if err := os.RemoveAll(stackDir()); err != nil {
 			return fmt.Errorf("failed to remove stack dir: %w", err)
@@ -461,7 +624,7 @@ var cmdUp = &cobra.Command{
 			return err
 		}
 
-		args = append([]string{"up", "--wait", "--remove-orphans", "--abort-on-container-failure"}, args...)
+		args = append([]string{"up", "--wait", "--remove-orphans"}, args...)
 
 		if err := runDockerCompose(args...); err != nil {
 			return err
@@ -512,7 +675,7 @@ func runDockerCompose(args ...string) error {
 
 	if _, err := os.Stat(composeFile); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("No compose.yaml found in %s", dest)
+			return fmt.Errorf("%w in %s", ErrStackNotExist, dest)
 		}
 
 		return err
