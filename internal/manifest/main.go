@@ -23,9 +23,10 @@ var searchPatterns = []string{
 var ignorePatterns = normalizeIgnorePatterns([]string{
 	".DS_Store",
 	"*.tmp",
+	"*.bak",
 })
 
-type FileEntry struct {
+type fileMeta struct {
 	Path   string
 	Size   int64
 	Perm   fs.FileMode
@@ -43,17 +44,6 @@ func normalizeIgnorePatterns(patterns []string) []string {
 	return out
 }
 
-func shouldIgnore(path string) bool {
-	base := filepath.Base(path)
-	for _, pat := range ignorePatterns {
-		matched, _ := filepath.Match(pat, base)
-		if matched {
-			return true
-		}
-	}
-	return false
-}
-
 func computeSHA256(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -69,7 +59,7 @@ func computeSHA256(path string) (string, error) {
 }
 
 func main() {
-	var fileList []FileEntry
+	var filesMeta []fileMeta
 
 	for _, pat := range searchPatterns {
 		matches, err := doublestar.Glob(os.DirFS("."), pat)
@@ -102,7 +92,7 @@ func main() {
 				panic(err)
 			}
 
-			fileList = append(fileList, FileEntry{
+			filesMeta = append(filesMeta, fileMeta{
 				Path:   filepath.ToSlash(rel),
 				Size:   info.Size(),
 				Perm:   info.Mode().Perm(),
@@ -111,8 +101,8 @@ func main() {
 		}
 	}
 
-	sort.Slice(fileList, func(i, j int) bool {
-		return fileList[i].Path < fileList[j].Path
+	sort.Slice(filesMeta, func(i, j int) bool {
+		return filesMeta[i].Path < filesMeta[j].Path
 	})
 
 	f, err := os.Create(outFile)
@@ -127,26 +117,26 @@ func main() {
 	fmt.Fprintln(f, "import \"embed\"")
 	fmt.Fprintln(f, "import \"os\"")
 	fmt.Fprintln(f, "")
-	fmt.Fprintln(f, "type FileEntry struct {")
+	fmt.Fprintln(f, "type fileMeta struct {")
 	fmt.Fprintln(f, "\tPath string")
 	fmt.Fprintln(f, "\tSize int64")
 	fmt.Fprintln(f, "\tPerm os.FileMode")
 	fmt.Fprintln(f, "\tSha256 string")
 	fmt.Fprintln(f, "}")
 	fmt.Fprintln(f, "")
-	for _, file := range fileList {
+	for _, file := range filesMeta {
 		fmt.Fprintln(f, "//go:embed ", file.Path)
 	}
-	fmt.Fprintln(f, "var embeddedFiles embed.FS")
+	fmt.Fprintln(f, "var stackFilesFS embed.FS")
 	fmt.Fprintln(f, "")
-	fmt.Fprintln(f, "var fileList = []FileEntry{")
-	fmt.Printf("Discovered files: %d\n", len(fileList))
-	for _, file := range fileList {
+	fmt.Fprintln(f, "var stackFilesMeta = []fileMeta{")
+	fmt.Printf("Discovered files: %d\n", len(filesMeta))
+	for _, file := range filesMeta {
 		fmt.Fprintf(f,
 			"\t{Path: %q, Perm: 0%o, Size: %d, Sha256: %q},\n",
 			file.Path, file.Perm, file.Size, file.Sha256)
 
-		fmt.Printf("- %s (%.1fK)\n", file.Path, float64(file.Size)/1024)
+		fmt.Printf("%s %s (%.1fK)\n", file.Perm.String(), file.Path, float64(file.Size)/1024)
 	}
 	fmt.Fprintln(f, "}")
 }

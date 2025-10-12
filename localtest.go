@@ -1,4 +1,4 @@
-//go:generate go run ./helper/manifest
+//go:generate go run ./internal/manifest
 
 package main
 
@@ -228,7 +228,7 @@ func verifyAllSHA256(dest string) error {
 
 	failures := 0
 
-	for _, file := range fileList {
+	for _, file := range stackFilesMeta {
 		dst := filepath.Join(dest, file.Path)
 
 		valid, err := verifySHA256(dst, file.Sha256)
@@ -248,6 +248,11 @@ func verifyAllSHA256(dest string) error {
 		return fmt.Errorf("WARNING: %d computed checksum did NOT match", failures)
 	}
 
+	return nil
+}
+
+func showInfo(dest string) error {
+	fmt.Printf("Stack directory:	%s\n", dest)
 	return nil
 }
 
@@ -283,9 +288,9 @@ func extractStackFiles(dest string, cleanup bool) error {
 		}
 	}
 
-	fmt.Printf("Extracting %d files to %s directory:\n", len(fileList), dest)
-	for _, file := range fileList {
-		data, err := embeddedFiles.ReadFile(file.Path)
+	fmt.Printf("Extracting %d files to %s directory:\n", len(stackFilesMeta), dest)
+	for _, file := range stackFilesMeta {
+		data, err := stackFilesFS.ReadFile(file.Path)
 		if err != nil {
 			return err
 		}
@@ -376,11 +381,8 @@ func main() {
 	}
 }
 
-var showDir bool
-
 func init() {
-	rootCmd.AddCommand(upCmd, downCmd, logsCmd, psCmd, rmCmd, verifyCmd)
-	rootCmd.Flags().BoolVar(&showDir, "dir", false, "Print stack directory and exit")
+	rootCmd.AddCommand(cmdUp, cmdDown, cmdLogs, cmdPs, cmdRm, cmdVerify, cmdInfo)
 
 	rootCmd.SetVersionTemplate(`{{printf "%s\n" .Version}}`)
 }
@@ -390,19 +392,9 @@ var rootCmd = &cobra.Command{
 	Short:        fmt.Sprintf("Smart %s stack controller", appName),
 	SilenceUsage: true,
 	Version:      renderVersion(),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return cmd.Help()
-	},
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if showDir {
-			fmt.Println(stackDir())
-			os.Exit(0)
-		}
-		return nil
-	},
 }
 
-var upCmd = &cobra.Command{
+var cmdUp = &cobra.Command{
 	Use:                "up",
 	Short:              "Spin up the stack",
 	DisableFlagParsing: true,
@@ -418,7 +410,7 @@ var upCmd = &cobra.Command{
 	},
 }
 
-var downCmd = &cobra.Command{
+var cmdDown = &cobra.Command{
 	Use:                "down",
 	Short:              "Tear down the stack",
 	DisableFlagParsing: true,
@@ -427,7 +419,7 @@ var downCmd = &cobra.Command{
 	},
 }
 
-var logsCmd = &cobra.Command{
+var cmdLogs = &cobra.Command{
 	Use:                "logs",
 	Short:              "Show stack logs",
 	DisableFlagParsing: true,
@@ -436,7 +428,7 @@ var logsCmd = &cobra.Command{
 	},
 }
 
-var psCmd = &cobra.Command{
+var cmdPs = &cobra.Command{
 	Use:                "ps",
 	Short:              "Show stack containers",
 	DisableFlagParsing: true,
@@ -445,7 +437,7 @@ var psCmd = &cobra.Command{
 	},
 }
 
-var rmCmd = &cobra.Command{
+var cmdRm = &cobra.Command{
 	Use:   "rm",
 	Short: "Tear down the stack and remove cache",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -460,11 +452,19 @@ var rmCmd = &cobra.Command{
 	},
 }
 
-var verifyCmd = &cobra.Command{
+var cmdVerify = &cobra.Command{
 	Use:   "verify",
 	Short: "Verify integrity",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return verifyAllSHA256(stackDir())
+	},
+}
+
+var cmdInfo = &cobra.Command{
+	Use:   "info",
+	Short: "Show info",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return showInfo(stackDir())
 	},
 }
 
