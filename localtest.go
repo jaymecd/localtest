@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -11,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -238,6 +240,35 @@ func (s *StackVersion) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+func Confirm(prompt string, defaultYes bool) bool {
+	reader := bufio.NewReader(os.Stdin)
+
+	if defaultYes {
+		fmt.Printf("%s [Y/n]: ", prompt)
+	} else {
+		fmt.Printf("%s [y/N]: ", prompt)
+	}
+
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(strings.ToLower(input))
+
+	return (defaultYes && input == "") || input == "y" || input == "yes"
+}
+
+func HasInternetConnection() bool {
+	client := http.Client{
+		Timeout: 3 * time.Second,
+	}
+
+	resp, err := client.Head("https://www.google.com/generate_204")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode == http.StatusNoContent
+}
+
 func computeSHA256(filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -389,7 +420,7 @@ func syncStack(update bool) (bool, error) {
 		}
 
 		if rebuild {
-			os.WriteFile(rebuildFile, []byte("1"), 0600)
+			os.WriteFile(rebuildFile, []byte{}, 0600)
 		}
 	}
 
@@ -437,10 +468,7 @@ func showInfo(dest string) error {
 		return fmt.Errorf("stack exists, failed to read info (%w)\n", err)
 	}
 
-	rebuild, err := os.ReadFile(rebuildFile)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
+	rebuild := fileExists(rebuildFile)
 
 	fmt.Printf("Stack created at:  %s (%s ago)\n", sv.CreatedAt.Format(time.RFC3339), time.Since(sv.CreatedAt).Round(time.Second))
 	fmt.Printf("Stack updated at:  %s (%s ago)\n", sv.UpdatedAt.Format(time.RFC3339), time.Since(sv.UpdatedAt).Round(time.Second))
@@ -451,7 +479,7 @@ func showInfo(dest string) error {
 		fmt.Printf("\nINFO: stack and binary versions do not match, please run 'sync' command.\n")
 	}
 
-	if string(rebuild) == "1" {
+	if rebuild {
 		fmt.Printf("\nINFO: stack rebuild is pending, please run 'up' command.\n")
 	}
 
@@ -682,7 +710,18 @@ var cmdUp = &cobra.Command{
 		args = append([]string{"up", "--wait", "--remove-orphans"}, args...)
 
 		if rebuild {
-			args = append(args, "--always-recreate-deps", "--force-recreate")
+			fmt.Printf("Stack upgrade is pending ...\n")
+			if !HasInternetConnection() {
+				fmt.Printf("WARN: running in offline mode, upgrade is postponed ;)\n")
+				rebuild = false
+			} else if !Confirm("Proceed with upgrade?", true) {
+				fmt.Printf("INFO: decided to postpone upgrade\n")
+				rebuild = false
+			}
+		}
+
+		if rebuild {
+			args = append(args, "--always-recreate-deps", "--force-recreate", "--build")
 		}
 
 		if err := runDockerCompose(args...); err != nil {
