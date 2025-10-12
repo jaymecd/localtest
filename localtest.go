@@ -194,7 +194,7 @@ func deepCompare(file1, file2 string) (bool, error) {
 	}
 }
 
-func initStack() error {
+func syncStack(update bool) error {
 	dest := stackDir()
 
 	versionFile := filepath.Join(dest, ".version")
@@ -236,9 +236,7 @@ func verifyAllSHA256(dest string) error {
 			return err
 		}
 
-		if valid {
-			fmt.Printf("%s: OK\n", file.Path)
-		} else {
+		if !valid {
 			fmt.Printf("%s: FAILED\n", file.Path)
 			failures++
 		}
@@ -298,7 +296,7 @@ func extractStackFiles(dest string, cleanup bool) error {
 		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 			return err
 		}
-		fmt.Printf("- %s (%.1fK)\n", file.Path, float64(file.Size)/1024)
+		fmt.Printf("%s %s (%.1fK)\n", file.Perm.String(), file.Path, float64(file.Size)/1024)
 		if err := os.WriteFile(dst, data, file.Perm); err != nil {
 			return err
 		}
@@ -382,7 +380,11 @@ func main() {
 }
 
 func init() {
-	rootCmd.AddCommand(cmdUp, cmdDown, cmdLogs, cmdPs, cmdRm, cmdVerify, cmdInfo)
+	cmdRm.Flags().BoolP("all", "a", false, "all resources such as volumes, images & etc ...")
+
+	rootCmd.AddCommand(cmdSync, cmdRm, cmdVerify, cmdInfo)
+	// docker compose proxies
+	rootCmd.AddCommand(cmdUp, cmdDown, cmdLogs, cmdPs)
 
 	rootCmd.SetVersionTemplate(`{{printf "%s\n" .Version}}`)
 }
@@ -394,46 +396,17 @@ var rootCmd = &cobra.Command{
 	Version:      renderVersion(),
 }
 
-var cmdUp = &cobra.Command{
-	Use:                "up",
-	Short:              "Spin up the stack",
-	DisableFlagParsing: true,
+var cmdSync = &cobra.Command{
+	Use:   "sync",
+	Short: "Sync the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := initStack(); err != nil {
+		if err := syncStack(true); err != nil {
 			return err
 		}
-		if err := runDockerCompose(append([]string{"up", "--wait"}, args...)...); err != nil {
-			return err
-		}
-		fmt.Printf("\nNow it's time to open %s and enjoy local development. ;)\n", appUrl)
+
+		fmt.Printf("Synchronization DONE\n")
+
 		return nil
-	},
-}
-
-var cmdDown = &cobra.Command{
-	Use:                "down",
-	Short:              "Tear down the stack",
-	DisableFlagParsing: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runDockerCompose(append([]string{"down", "--remove-orphans"}, args...)...)
-	},
-}
-
-var cmdLogs = &cobra.Command{
-	Use:                "logs",
-	Short:              "Show stack logs",
-	DisableFlagParsing: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runDockerCompose(append([]string{"logs"}, args...)...)
-	},
-}
-
-var cmdPs = &cobra.Command{
-	Use:                "ps",
-	Short:              "Show stack containers",
-	DisableFlagParsing: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runDockerCompose(append([]string{"ps"}, args...)...)
 	},
 }
 
@@ -441,13 +414,24 @@ var cmdRm = &cobra.Command{
 	Use:   "rm",
 	Short: "Tear down the stack and remove cache",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_ = runDockerCompose("down", "--remove-orphans", "--volumes", "--rmi", "all")
-		fmt.Println("Stack cleaned up")
+		args = append([]string{"down", "--remove-orphans"}, args...)
+
+		if cmd.Flags().Changed("all") {
+			args = append(args, "--volumes", "--rmi", "all")
+		}
+
+		if err := runDockerCompose(args...); err != nil {
+			fmt.Printf("Stack clean up: %v\n", err)
+		} else {
+			fmt.Println("Stack cleaned up")
+		}
 
 		if err := os.RemoveAll(stackDir()); err != nil {
 			return fmt.Errorf("failed to remove stack dir: %w", err)
 		}
+
 		fmt.Println("Storage cleaned up")
+
 		return nil
 	},
 }
@@ -468,6 +452,60 @@ var cmdInfo = &cobra.Command{
 	},
 }
 
+var cmdUp = &cobra.Command{
+	Use:                "up",
+	Short:              "Spin up the stack via 'docker compose up'",
+	DisableFlagParsing: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := syncStack(false); err != nil {
+			return err
+		}
+
+		args = append([]string{"up", "--wait", "--remove-orphans", "--abort-on-container-failure"}, args...)
+
+		if err := runDockerCompose(args...); err != nil {
+			return err
+		}
+
+		fmt.Printf("\nNow it's time to open %s and enjoy local development. ;)\n", appUrl)
+
+		return nil
+	},
+}
+
+var cmdDown = &cobra.Command{
+	Use:                "down",
+	Short:              "Tear down the stack via 'docker compose down'",
+	DisableFlagParsing: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runDockerCompose(append([]string{"down", "--remove-orphans"}, args...)...)
+	},
+}
+
+var cmdLogs = &cobra.Command{
+	Use:                "logs",
+	Short:              "Show stack logs via 'docker compose logs'",
+	DisableFlagParsing: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runDockerCompose(append([]string{"logs"}, args...)...)
+	},
+}
+
+var cmdPs = &cobra.Command{
+	Use:                "ps",
+	Short:              "Show stack containers via 'docker compose ps'",
+	DisableFlagParsing: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		args = append([]string{"ps"}, args...)
+
+		if err := runDockerCompose(args...); err != nil {
+			return err
+		}
+
+		return nil
+	},
+}
+
 func runDockerCompose(args ...string) error {
 	dest := stackDir()
 	composeFile := filepath.Join(dest, "compose.yaml")
@@ -476,6 +514,7 @@ func runDockerCompose(args ...string) error {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("No compose.yaml found in %s", dest)
 		}
+
 		return err
 	}
 
@@ -488,6 +527,7 @@ func runDockerCompose(args ...string) error {
 
 	preview_cmd := strings.Join(append([]string{"docker", "compose"}, args...), " ")
 
-	fmt.Printf("Running %q command ...\n", preview_cmd)
+	fmt.Printf("Proxying call to %q ...\n", preview_cmd)
+
 	return cmd.Run()
 }
