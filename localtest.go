@@ -24,6 +24,7 @@ const appName = "localtest"
 const appUrl = "https://local.test/"
 
 const stackInfoFile = ".localtest"
+const stackRebuildFile = ".rebuild"
 
 var (
 	buildVersion = "unknown"
@@ -331,6 +332,7 @@ func deepCompare(file1, file2 string) (bool, error) {
 func syncStack(update bool) error {
 	dest := stackDir()
 	infoFile := filepath.Join(dest, stackInfoFile)
+	rebuildFile := filepath.Join(dest, stackRebuildFile)
 
 	sv := NewStackVersionV1()
 
@@ -341,6 +343,8 @@ func syncStack(update bool) error {
 
 		update = true
 	}
+
+	forceRebuild := !sv.IsSameBinaryVersion()
 
 	if update {
 		if err := extractStackFiles(dest, true); err != nil {
@@ -355,6 +359,10 @@ func syncStack(update bool) error {
 
 		if err := sv.SaveToFile(infoFile); err != nil {
 			return fmt.Errorf("failed saving, err: %w\n", err)
+		}
+
+		if forceRebuild {
+			os.WriteFile(rebuildFile, []byte("1"), 0600)
 		}
 	}
 
@@ -391,6 +399,7 @@ func showInfo(dest string) error {
 	fmt.Printf("Stack directory:   %s\n", dest)
 
 	infoFile := filepath.Join(dest, stackInfoFile)
+	rebuildFile := filepath.Join(dest, stackRebuildFile)
 
 	var sv StackVersion
 
@@ -401,13 +410,22 @@ func showInfo(dest string) error {
 		return fmt.Errorf("stack exists, failed to read info (%w)\n", err)
 	}
 
+	rebuild, err := os.ReadFile(rebuildFile)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
 	fmt.Printf("Stack created at:  %s (%s ago)\n", sv.CreatedAt.Format(time.RFC3339), time.Since(sv.CreatedAt).Round(time.Second))
 	fmt.Printf("Stack updated at:  %s (%s ago)\n", sv.UpdatedAt.Format(time.RFC3339), time.Since(sv.UpdatedAt).Round(time.Second))
 	fmt.Printf("Stack version:     %s (Built on %s from %s commit)\n", sv.Binary.Version, sv.Binary.Commit, sv.Binary.Date)
 	fmt.Printf("Binary version:    %s (Built on %s from %s commit)\n", buildVersion, buildCommit, buildDate)
 
 	if !sv.IsSameBinaryVersion() {
-		fmt.Printf("\nINFO: stack and binary versions do not match, please consider 'sync' stack.\n")
+		fmt.Printf("\nINFO: stack and binary versions do not match, please run 'sync' command.\n")
+	}
+
+	if string(rebuild) == "1" {
+		fmt.Printf("\nINFO: stack rebuild is pending, please run 'up' command.\n")
 	}
 
 	return nil
@@ -624,7 +642,19 @@ var cmdUp = &cobra.Command{
 			return err
 		}
 
+		dest := stackDir()
+		rebuildFile := filepath.Join(dest, stackRebuildFile)
+
 		args = append([]string{"up", "--wait", "--remove-orphans"}, args...)
+
+		rebuild, err := os.ReadFile(rebuildFile)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		if string(rebuild) == "1" {
+			args = append(args, "--always-recreate-deps", "--force-recreate")
+		}
 
 		if err := runDockerCompose(args...); err != nil {
 			return err
