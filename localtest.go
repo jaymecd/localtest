@@ -667,7 +667,7 @@ var cmdRm = &cobra.Command{
 		}
 
 		if !HasInternetConnection() {
-			return fmt.Errorf("running in offline mode, removal is postponed ;)")
+			return fmt.Errorf("running in OFFLINE mode, removal is postponed ;)")
 		}
 
 		if !Confirm("Are you sure to remove?", false) {
@@ -728,7 +728,7 @@ var cmdUp = &cobra.Command{
 		if rebuild {
 			fmt.Printf("Stack upgrade is pending ...\n")
 			if !HasInternetConnection() {
-				fmt.Printf("WARN: running in offline mode, upgrade is postponed ;)\n")
+				fmt.Printf("WARN: running in OFFLINE mode, upgrade is postponed ;)\n")
 				rebuild = false
 			} else if !Confirm("Proceed with upgrade?", true) {
 				fmt.Printf("INFO: decided to postpone upgrade\n")
