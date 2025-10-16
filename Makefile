@@ -7,9 +7,10 @@ DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 PREFIX 	?= /usr/local/bin
 
-LDFLAGS := -X 'main.buildVersion=$(VERSION)' \
-           -X 'main.buildCommit=$(COMMIT)' \
-           -X 'main.buildDate=$(DATE)'
+LDFLAGS := -s -w \
+		-X 'main.buildVersion=$(VERSION)' \
+		-X 'main.buildCommit=$(COMMIT)' \
+		-X 'main.buildDate=$(DATE)'
 
 all: build
 
@@ -18,7 +19,7 @@ build:
 	@echo ">> Running go generate ..."
 	go generate ./...
 	@echo ">> Building $(DIST)/$(BINARY) binary ..."
-	go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BINARY) .
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BINARY) .
 .PHONY: build
 
 install:
